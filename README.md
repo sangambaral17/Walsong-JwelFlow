@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Walsong JwelFlow — Premier Jewelry ERP
+**A Next-Generation, Local-First Management System for Sunchadi Pasals**
 
-## Getting Started
+> **Created and Directed by Sangam Baral, Founder & CEO**
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Overview
+Walsong JwelFlow is an ultra-premium, complete Enterprise Resource Planning (ERP) solution built from the ground up for modern jewelry shops. It combines luxurious aesthetics with robust, offline-capable architecture.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+It handles Inventory Management, Point of Sale (POS), Dhito/Bandhaki (Pawn/Loan) workflows, Role-Based Staff Management, and real-time Analytics — all without requiring a persistent internet connection.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Distribution & Deployment Strategies
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Walsong JwelFlow is designed to be distributed to clients in two distinct ways, depending on their needs:
 
-## Learn More
+### 1. Desktop Application (Native `.exe`)
+This is the **primary recommended way** to distribute JwelFlow to jewelry shop owners. It provides a secure, isolated environment where their business data is completely safe.
 
-To learn more about Next.js, take a look at the following resources:
+*   **How it works**: We use **Tauri** to package the Next.js web application into a native Windows executable.
+*   **Data Security**: The RxDB local database is stored deep within the Windows `%APPDATA%` folder. This means even if the user clears their web browser cookies or history, their gigabytes of shop data, invoices, and inventory remain perfectly intact and completely offline.
+*   **How to Build for Desktop**:
+    Please refer to our dedicated guide at `docs/BUILD_GUIDE.md` for exact terminal commands to generate the `WalsongJwelFlow_Setup.exe` file.
+*   **How to Distribute**: Simply copy the generated `_setup.exe` onto a Pen Drive and hand it to the shop owner. They double-click it, install it, and the app runs just like Microsoft Word or Excel.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. Web Application (Cloud Hosted)
+If a client wishes to access their shop dashboard from multiple devices (e.g., from home and the shop simultaneously), JwelFlow can be hosted as a traditional web application.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+*   **How it works**: The Next.js application is deployed to a cloud provider like Vercel, AWS, or Netlify.
+*   **Data Caveat**: Because it runs in a standard web browser (Chrome, Edge), the RxDB local database is stored in the browser's IndexedDB. **If the user clicks "Clear browsing data", their entire shop database will be permanently deleted.**
+*   *(Future Road-map: A remote synchronization server can be built using RxDB Sync to continuously backup data to a cloud PostgreSQL database, mitigating browser storage risks).*
+*   **How to Deploy for Web**:
+    1. Push this repository to GitHub.
+    2. Connect the repository to Vercel (or preferred host).
+    3. The build command is `npm run build` and the output directory is `.next`.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Technical Stack
+*   **Frontend Ecosystem**: Next.js 15 (React 19), Tailwind CSS, Framer Motion, customized Radix UI (`shadcn/ui`).
+*   **Database**: RxDB (Reactive Database) for offline-first, local hydration.
+*   **Packaging**: Tauri (Rust-based webview wrapper for Windows).
+*   **Theming**: Dynamic CSS custom property injection based on an Emerald/Luxury design system.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project Structure
+*   `/src/app`: Next.js App Router pages (Dashboard, POS, Inventory, Settings, etc.)
+*   `/src/components`: Reusable UI modules, including global shells and interactive modals.
+*   `/src/lib`: Core logic. `db/` contains RxDB schemas and setup. `auth-context.tsx` and `shop-context.tsx` manage global state.
+*   `/src-tauri`: The Rust backend and configuration required to compile the Windows `.exe`.
+*   `/docs`: Detailed guides, including the `BUILD_GUIDE.md` and `USER_MANUAL.md`.
+
+---
+*Developed with precision for the modern jewelry industry.*
+**© 2026 Walsong JwelFlow. Sangam Baral, Founder & CEO.**
