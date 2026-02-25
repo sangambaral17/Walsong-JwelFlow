@@ -118,7 +118,8 @@ export default function ReportsPage() {
                                                 <Tooltip
                                                     contentStyle={{ backgroundColor: "#121212", borderColor: "rgba(255,255,255,0.1)", borderRadius: "8px" }}
                                                     itemStyle={{ color: themeColor }}
-                                                    formatter={(value: number) => [`रू ${value.toLocaleString()}`, "Revenue"]}
+                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                    formatter={(value: any) => [`रु ${Number(value).toLocaleString()}`, "Revenue"]}
                                                 />
                                                 <Area type="monotone" dataKey="revenue" stroke={themeColor} strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
                                             </AreaChart>
@@ -143,9 +144,10 @@ export default function ReportsPage() {
                                                 <Tooltip
                                                     contentStyle={{ backgroundColor: "#121212", borderColor: "rgba(255,255,255,0.1)", borderRadius: "8px" }}
                                                     itemStyle={{ color: "#50C878" }}
-                                                    formatter={(value: number) => [`रू ${value.toLocaleString()}`, "Profit"]}
+                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                    formatter={(value: any) => [`रु ${Number(value).toLocaleString()}`, "Profit"]}
                                                 />
-                                                <Line type="monotone" dataKey="profit" stroke="#50C878" strokeWidth={3} dot={{ r: 4, fill: "#121212", strokeLinewidth: 2 }} activeDot={{ r: 6 }} />
+                                                <Line type="monotone" dataKey="profit" stroke="#50C878" strokeWidth={3} dot={{ r: 4, fill: "#121212", strokeWidth: 2 }} activeDot={{ r: 6 }} />
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </div>
