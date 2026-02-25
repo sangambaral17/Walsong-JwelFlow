@@ -22,9 +22,9 @@ export class WeighingScaleService {
     async readWeight(onWeightUpdate: (weight: number) => void) {
         if (!this.port) throw new Error('Port not open');
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const textDecoder = new TextDecoderStream();
-        const readableStreamClosed = this.port.readable!.pipeTo(textDecoder.writable);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const readableStreamClosed = this.port.readable!.pipeTo(textDecoder.writable as any);
         this.reader = textDecoder.readable.getReader();
 
         try {
