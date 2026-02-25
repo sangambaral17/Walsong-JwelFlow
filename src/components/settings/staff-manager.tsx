@@ -24,11 +24,14 @@ export function StaffManager() {
         pin: "",
         role: "cashier", // Default
     });
+    const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+    const [editPin, setEditPin] = useState("");
+    const [editName, setEditName] = useState("");
 
     const loadStaff = async () => {
         const db = await getDb();
         const allStaff = await db.staff.find().exec();
-        setStaffList(allStaff.map(doc => doc.toJSON() as Staff));
+        setStaffList(allStaff.map((doc: any) => doc.toJSON() as Staff));
     };
 
     useEffect(() => {
@@ -85,6 +88,26 @@ export function StaffManager() {
                 details: `Deleted user: ${name}`,
                 user: "owner"
             });
+            loadStaff();
+        }
+    };
+
+    const handleUpdatePin = async () => {
+        if (!editingStaffId || !editPin) return;
+
+        const db = await getDb();
+        const doc = await db.staff.findOne(editingStaffId).exec();
+        if (doc) {
+            await doc.patch({ pin: editPin, name: editName });
+            await db.audit_log.insert({
+                id: crypto.randomUUID(),
+                timestamp: new Date().toISOString(),
+                action: "STAFF_PIN_UPDATE",
+                details: `Updated PIN for user: ${editName}`,
+                user: "owner"
+            });
+            setEditingStaffId(null);
+            setEditPin("");
             loadStaff();
         }
     };
@@ -148,20 +171,55 @@ export function StaffManager() {
 
             <div className="space-y-3">
                 {staffList.map((staff) => (
-                    <div key={staff.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/30 hover:bg-background/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${staff.role === 'owner' ? 'bg-primary/20 text-primary' : staff.role === 'manager' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
-                                {staff.role === 'owner' ? <Key className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                    <div key={staff.id} className="flex flex-col space-y-2 p-4 rounded-xl border border-border/40 bg-background/30 hover:bg-background/50 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${staff.role === 'owner' ? 'bg-primary/20 text-primary' : staff.role === 'manager' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                                    {staff.role === 'owner' ? <Key className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                                </div>
+                                <div>
+                                    <p className="font-medium text-foreground">{staff.name} {staff.role === 'owner' && "(Master Account)"}</p>
+                                    <p className="text-xs uppercase tracking-wider text-muted-foreground">{staff.role}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="font-medium text-foreground">{staff.name}</p>
-                                <p className="text-xs uppercase tracking-wider text-muted-foreground">{staff.role}</p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setEditingStaffId(staff.id);
+                                        setEditPin(staff.pin);
+                                        setEditName(staff.name);
+                                    }}
+                                    className="text-primary hover:bg-primary/10"
+                                >
+                                    Modify
+                                </Button>
+                                {staff.role !== 'owner' && (
+                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(staff.id, staff.name)} className="text-destructive hover:bg-destructive/10">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
                             </div>
                         </div>
-                        {staff.role !== 'owner' && (
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(staff.id, staff.name)} className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
+
+                        {editingStaffId === staff.id && (
+                            <div className="pt-4 border-t border-border/20 space-y-4 animate-in slide-in-from-top-2">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] uppercase">Display Name</Label>
+                                        <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-9 bg-background/50" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] uppercase">Security PIN</Label>
+                                        <Input type="password" value={editPin} onChange={e => setEditPin(e.target.value)} className="h-9 bg-background/50 font-mono tracking-widest" maxLength={10} />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button onClick={handleUpdatePin} size="sm" className="flex-1 bg-primary text-primary-foreground">Update Access</Button>
+                                    <Button variant="ghost" size="sm" onClick={() => setEditingStaffId(null)}>Cancel</Button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 ))}

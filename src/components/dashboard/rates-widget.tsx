@@ -1,50 +1,59 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/db";
+import { syncMarketRates } from "@/lib/rates-sync";
+import { useShop } from "@/lib/shop-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Coins, TrendingUp } from "lucide-react";
+import { Coins, TrendingUp, Calendar } from "lucide-react";
 
 export function RatesWidget() {
+    const { profile } = useShop();
     const [rates, setRates] = useState<{ gold: number; silver: number } | null>(null);
+    const [updateDate, setUpdateDate] = useState<string>("");
 
     useEffect(() => {
-        // Mocking rates setup: usually fetched from an API
         const loadRates = async () => {
+            // Trigger sync service
+            await syncMarketRates();
+
             const db = await getDb();
             const today = new Date().toISOString().split('T')[0];
+            setUpdateDate(new Date().toLocaleDateString('ne-NP', { year: 'numeric', month: 'long', day: 'numeric' }));
 
-            let currentRate = await db.rates.findOne(today).exec();
-            if (!currentRate) {
-                currentRate = await db.rates.insert({
-                    date: today,
-                    gold_tola_rate: 314800,
-                    silver_tola_rate: 4200 // Mocked silver rate
+            let currentRateSnapshot = await db.rates.findOne(today).exec();
+            if (currentRateSnapshot) {
+                // Apply Owner Premium
+                setRates({
+                    gold: currentRateSnapshot.gold_tola_rate + (profile.premium_gold || 0),
+                    silver: currentRateSnapshot.silver_tola_rate + (profile.premium_silver || 0)
                 });
             }
-
-            setRates({
-                gold: currentRate.gold_tola_rate,
-                silver: currentRate.silver_tola_rate
-            });
         };
 
         loadRates();
-    }, []);
+    }, [profile.premium_gold, profile.premium_silver]);
 
     return (
         <Card className="bg-card/40 backdrop-blur-xl border-primary/20 bg-gradient-to-br from-card/80 to-card/10 shadow-2xl relative overflow-hidden group w-full">
             <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            <CardHeader>
-                <CardTitle className="text-xl font-medium tracking-wide flex items-center space-x-2 text-primary">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    <span>Live Market Rates</span>
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                    NPR values per Fine Tola
-                </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                    <CardTitle className="text-xl font-medium tracking-wide flex items-center space-x-2 text-primary">
+                        <TrendingUp className="h-5 w-5 text-primary" />
+                        <span>Live Market Rates</span>
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                        NPR values per Fine Tola (incl. Shop Premium)
+                    </CardDescription>
+                </div>
+                <div className="flex flex-col items-end">
+                    <span className="text-[10px] uppercase tracking-tighter text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        Market Updated
+                    </span>
+                    <span className="text-xs font-medium text-foreground">{updateDate || "Synchronizing..."}</span>
+                </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
                 {rates ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-1 p-5 rounded-xl bg-background/30 border border-primary/10 hover:border-primary/40 transition-colors shadow-inner backdrop-blur-sm relative overflow-hidden">

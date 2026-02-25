@@ -7,12 +7,96 @@ import { BackupButton } from "@/components/settings/backup-button";
 import { EodModal } from "@/components/reports/eod-modal";
 import { useShop } from "@/lib/shop-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getDb } from "@/lib/db";
 
 export default function Home() {
   const { profile } = useShop();
-  const { lockSession } = useAuth();
+  const { lockSession, user } = useAuth();
+  const [showFinancials, setShowFinancials] = useState(false);
+
+  // Live Stats State
+  const [stats, setStats] = useState({
+    goldWeight: { t: 0, m: 0, l: 0 },
+    silverWeight: { t: 0, m: 0, l: 0 },
+    revenueDay: 0,
+    dhitoLiability: 0,
+    itemCount: 0
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const db = await getDb();
+
+      // 1. Gold Stock (Sum of net_weight where weight_tola > 0 or categories like Gold)
+      const inventory = await db.inventory.find().exec();
+      let totalGoldGrams = 0;
+      let totalSilverGrams = 0;
+      inventory.forEach((item: any) => {
+        if (item.category?.toLowerCase().includes('gold')) {
+          totalGoldGrams += item.net_weight_grams || 0;
+        } else if (item.category?.toLowerCase().includes('silver')) {
+          totalSilverGrams += item.net_weight_grams || 0;
+        }
+      });
+
+      // Simple Grams to T/M/L conversion (Approx: 1 Tola = 11.66g, 1 Masha = 0.97g, 1 Lal = 0.01g)
+      const toTML = (grams: number) => {
+        const t = Math.floor(grams / 11.6639);
+        const remainingAfterT = grams % 11.6639;
+        const m = Math.floor(remainingAfterT / 0.972);
+        const l = Math.round((remainingAfterT % 0.972) / 0.0116);
+        return { t, m, l };
+      };
+
+      // 2. Revenue (Sum from Audit Log for today)
+      const today = new Date().toISOString().split('T')[0];
+      const logs = await db.audit_log.find({
+        selector: {
+          timestamp: { $gte: today },
+          action: 'BILL_GENERATED'
+        }
+      }).exec();
+      let revenue = 0;
+      logs.forEach((log: any) => {
+        try {
+          const details = JSON.parse(log.details);
+          revenue += details.total_amount || 0;
+        } catch (e) { }
+      });
+
+      // 3. Dhito Liability
+      const dhitos = await db.dhito.find({
+        selector: { status: 'active' }
+      }).exec();
+      let liability = 0;
+      dhitos.forEach((d: any) => liability += d.loan_amount || 0);
+
+      setStats({
+        goldWeight: toTML(totalGoldGrams),
+        silverWeight: toTML(totalSilverGrams),
+        revenueDay: revenue,
+        dhitoLiability: liability,
+        itemCount: inventory.length
+      });
+    };
+
+    fetchStats();
+
+    // Subscribe to changes
+    const dbPromise = getDb();
+    let sub: any;
+    dbPromise.then((db: any) => {
+      sub = db.inventory.find().$.subscribe(() => fetchStats());
+    });
+
+    return () => sub?.unsubscribe();
+  }, []);
+
+  const isOwner = user?.role === "owner";
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
       {/* Subtle radial glow behind header */}
@@ -60,11 +144,60 @@ export default function Home() {
         {/* Welcome Section */}
         <section className="flex items-center justify-between pt-4">
           <div className="space-y-2">
-            <h2 className="text-4xl font-medium tracking-tight">JwelFlow Dashboard</h2>
+            <h2 className="text-4xl font-medium tracking-tight">Welcome, {user?.name || "Walsong Group"}</h2>
             <p className="text-muted-foreground text-lg">Manage inventory, process sales, and monitor real-time market rates.</p>
           </div>
-          <EodModal />
+          <div className="flex items-center gap-3">
+            {isOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFinancials(!showFinancials)}
+                className="bg-card/50 backdrop-blur-md border-primary/20 hover:border-primary/50 transition-all"
+              >
+                {showFinancials ? <><EyeOff className="w-4 h-4 mr-2 text-primary" /> Mask Financials</> : <><Eye className="w-4 h-4 mr-2 text-primary" /> Reveal Financials</>}
+              </Button>
+            )}
+            <EodModal />
+          </div>
         </section>
+
+        {/* Zero State / Welcome Banner */}
+        {stats.itemCount === 0 && (
+          <div className="glass-card border-primary/20 bg-gradient-to-r from-primary/10 via-background to-transparent p-8 rounded-2xl flex items-center justify-between overflow-hidden relative group">
+            <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-1000"></div>
+            <div className="space-y-4 relative z-10 max-w-xl">
+              <div className="flex items-center gap-2 text-primary font-bold uppercase tracking-widest text-xs">
+                <CheckCircle2 className="w-4 h-4" />
+                Ready for Production
+              </div>
+              <h3 className="text-3xl font-bold tracking-tight">Welcome to JewelFlow by Walsong Group</h3>
+              <p className="text-muted-foreground text-lg">
+                Your system is locally synchronized and secure. Start by adding items to your inventory or configuring your staff roles in Settings.
+              </p>
+              <div className="flex gap-4">
+                <Link href="/inventory">
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+                    <Package className="w-4 h-4 mr-2" /> Add First Item
+                  </Button>
+                </Link>
+                <Link href="/settings">
+                  <Button variant="outline" className="border-border/60 hover:border-primary/40">
+                    <Settings className="w-4 h-4 mr-2" /> Configure App
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="hidden lg:flex relative z-10">
+              <div className="w-32 h-32 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center rotate-12 -mr-8 animate-pulse hover:rotate-0 transition-all duration-700">
+                <History className="w-12 h-12 text-primary/40" />
+              </div>
+              <div className="w-32 h-32 rounded-3xl bg-primary/20 border border-primary/30 flex items-center justify-center -rotate-6 animate-pulse hover:rotate-0 transition-all duration-700 delay-150">
+                <TrendingUp className="w-12 h-12 text-primary/60" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Daily Rates + Quick Actions */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -73,8 +206,8 @@ export default function Home() {
           </div>
 
           <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-            <Link href="/pos" className="block group">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5">
+            <Link href="/pos" className="block group h-full">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
                 <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
                   <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                     <HandCoins className="w-6 h-6 text-primary" />
@@ -84,8 +217,8 @@ export default function Home() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/inventory" className="block group">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5">
+            <Link href="/inventory" className="block group h-full">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
                 <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
                   <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                     <Package className="w-6 h-6 text-foreground" />
@@ -110,21 +243,33 @@ export default function Home() {
                     <ShieldCheck className="w-6 h-6" />
                     Stock Portfolio
                   </CardTitle>
-                  <CardDescription>Protected confidential data</CardDescription>
+                  <CardDescription>Real-time inventory calculation</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4 relative z-10">
                     <div className="flex justify-between items-center p-4 bg-background/50 rounded-xl border border-border/50">
                       <span className="text-muted-foreground uppercase text-xs tracking-wider">Total Gold Stock</span>
-                      <span className="font-mono font-medium text-lg">145<span className="text-xs text-muted-foreground">T</span> 5<span className="text-xs text-muted-foreground">M</span> 0<span className="text-xs text-muted-foreground">L</span></span>
+                      <span className="font-mono font-medium text-lg">
+                        {stats.goldWeight.t}<span className="text-xs text-muted-foreground">T</span> {stats.goldWeight.m}<span className="text-xs text-muted-foreground">M</span> {stats.goldWeight.l}<span className="text-xs text-muted-foreground">L</span>
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-background/50 rounded-xl border border-border/50">
                       <span className="text-muted-foreground uppercase text-xs tracking-wider">Total Silver Stock</span>
-                      <span className="font-mono font-medium text-lg">850<span className="text-xs text-muted-foreground">T</span> 0<span className="text-xs text-muted-foreground">M</span> 0<span className="text-xs text-muted-foreground">L</span></span>
+                      <span className="font-mono font-medium text-lg">
+                        {stats.silverWeight.t}<span className="text-xs text-muted-foreground">T</span> {stats.silverWeight.m}<span className="text-xs text-muted-foreground">M</span> {stats.silverWeight.l}<span className="text-xs text-muted-foreground">L</span>
+                      </span>
                     </div>
-                    <div className="flex justify-between items-center p-4 bg-primary/10 rounded-xl border border-primary/20 mt-4">
-                      <span className="text-primary font-medium tracking-wide">Estimated Value</span>
-                      <span className="font-mono font-bold text-2xl text-foreground tracking-tight">रू 4,85,60,000</span>
+                    <div className="flex justify-between items-center p-4 bg-primary/10 rounded-xl border border-primary/20 mt-4 h-16">
+                      <span className="text-primary font-medium tracking-wide">Daily Revenue</span>
+                      <span className={`font-mono font-bold text-2xl text-foreground tracking-tight transition-all duration-500 ${!showFinancials ? 'blur-md select-none' : ''}`}>
+                        रू {stats.revenueDay.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-4 bg-secondary/20 rounded-xl border border-border/30 h-16">
+                      <span className="text-muted-foreground font-medium tracking-wide">Dhito Liability</span>
+                      <span className={`font-mono font-bold text-2xl text-foreground tracking-tight transition-all duration-500 ${!showFinancials ? 'blur-md select-none' : ''}`}>
+                        रू {stats.dhitoLiability.toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -163,7 +308,6 @@ export default function Home() {
             </div>
           </PinLock>
         </section>
-
       </main>
     </div>
   );

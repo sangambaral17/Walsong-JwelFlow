@@ -40,3 +40,38 @@ export const getDb = () => {
     }
     return dbPromise;
 };
+
+export const resetDatabase = async () => {
+    const db = await getDb();
+    const collections = ['inventory', 'dhito', 'rates', 'audit_log', 'customers', 'staff'];
+
+    // Wipe all business data but keep ShopProfile for branding persistence
+    for (const name of collections) {
+        const col = db[name];
+        await col.find().remove();
+    }
+
+    // Reset Default Owner if deleted (unlikely but safe)
+    const owner = await db.staff.findOne("default_owner").exec();
+    if (!owner) {
+        await db.staff.insert({
+            id: "default_owner",
+            name: "Owner",
+            pin: "1234",
+            role: "owner",
+            active: true
+        });
+    }
+};
+
+export const exportEncryptedBackup = async () => {
+    const db = await getDb();
+    const data = await db.exportJSON();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jwelflow_emergency_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+};

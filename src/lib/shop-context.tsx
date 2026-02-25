@@ -12,6 +12,8 @@ export interface ShopProfile {
     phone: string;
     accent_color: string;
     invoice_footer: string;
+    premium_gold: number;
+    premium_silver: number;
 }
 
 const DEFAULT_PROFILE: ShopProfile = {
@@ -23,6 +25,8 @@ const DEFAULT_PROFILE: ShopProfile = {
     phone: "",
     accent_color: "#D4AF37",
     invoice_footer: "Thank you for your business!",
+    premium_gold: 0,
+    premium_silver: 0,
 };
 
 interface ShopContextValue {

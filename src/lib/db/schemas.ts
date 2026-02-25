@@ -84,7 +84,9 @@ export const shopProfileSchema: RxJsonSchema<any> = {
         address: { type: 'string' },
         phone: { type: 'string' },
         accent_color: { type: 'string' },
-        invoice_footer: { type: 'string' }
+        invoice_footer: { type: 'string' },
+        premium_gold: { type: 'number' },
+        premium_silver: { type: 'number' }
     },
     required: ['id', 'shop_name', 'pan_vat_number']
 };
