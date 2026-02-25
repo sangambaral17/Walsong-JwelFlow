@@ -66,8 +66,15 @@ export const resetDatabase = async () => {
 
 export const exportEncryptedBackup = async () => {
     const db = await getDb();
-    const data = await db.exportJSON();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const collectionNames = ['inventory', 'dhito', 'rates', 'audit_log', 'shop_profile', 'customers', 'staff'];
+    const backup: Record<string, any[]> = {};
+
+    for (const name of collectionNames) {
+        const docs = await db[name].find().exec();
+        backup[name] = docs.map((d: any) => d.toJSON());
+    }
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

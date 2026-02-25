@@ -57,7 +57,7 @@ export default function Home() {
       const logs = await db.audit_log.find({
         selector: {
           timestamp: { $gte: today },
-          action: 'BILL_GENERATED'
+          action: 'SALE'
         }
       }).exec();
       let revenue = 0;
