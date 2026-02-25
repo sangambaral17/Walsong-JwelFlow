@@ -83,7 +83,41 @@ export const shopProfileSchema: RxJsonSchema<any> = {
         pan_vat_number: { type: 'string' },
         address: { type: 'string' },
         phone: { type: 'string' },
+        accent_color: { type: 'string' },
         invoice_footer: { type: 'string' }
     },
     required: ['id', 'shop_name', 'pan_vat_number']
+};
+
+export const customerSchema: RxJsonSchema<any> = {
+    title: 'customer schema',
+    version: 0,
+    description: 'customer database for the shop',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        name: { type: 'string' },
+        phone: { type: 'string' },
+        address: { type: 'string' },
+        notes: { type: 'string' },
+        created_at: { type: 'string' }
+    },
+    required: ['id', 'name', 'created_at']
+};
+
+export const staffSchema: RxJsonSchema<any> = {
+    title: 'staff schema',
+    version: 0,
+    description: 'staff accounts for role-based access control',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        name: { type: 'string' },
+        pin: { type: 'string', maxLength: 10 },
+        role: { type: 'string' }, // 'owner', 'manager', 'cashier'
+        active: { type: 'boolean' }
+    },
+    required: ['id', 'name', 'pin', 'role', 'active']
 };

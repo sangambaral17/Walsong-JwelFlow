@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
+import { AppShell } from "@/components/app-shell";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
@@ -15,7 +16,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Walsong JwelFlow — Premier Jewelry ERP",
-  description: "IRD-Compliant, Local-First Jewelry ERP for the Walsong Group, Nepal.",
+  description: "IRD-Compliant, Local-First Jewelry ERP for Nepal.",
 };
 
 export default function RootLayout({
@@ -25,10 +26,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body
-        className={`${playfair.variable} ${inter.variable} font-sans antialiased`}
-      >
-        {children}
+      <body className={`${playfair.variable} ${inter.variable} font-sans antialiased`}>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

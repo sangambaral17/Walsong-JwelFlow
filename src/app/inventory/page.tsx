@@ -191,7 +191,7 @@ export default function InventoryPage() {
             </header>
 
             <main className="container mx-auto px-4 py-8 max-w-6xl">
-                <PinLock>
+                <PinLock requiredRole="manager">
                     <div className="glass-card rounded-xl overflow-hidden gold-shimmer">
                         <Table>
                             <TableHeader>
