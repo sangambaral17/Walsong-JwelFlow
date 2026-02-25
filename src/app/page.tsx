@@ -1,11 +1,18 @@
+"use client";
+
 import { RatesWidget } from "@/components/dashboard/rates-widget";
 import { PinLock } from "@/components/auth/pin-lock";
+import { useAuth } from "@/lib/auth-context";
 import { BackupButton } from "@/components/settings/backup-button";
+import { EodModal } from "@/components/reports/eod-modal";
+import { useShop } from "@/lib/shop-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Package, Settings, HandCoins, Store, ShieldCheck, ArrowRight } from "lucide-react";
+import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
+  const { profile } = useShop();
+  const { lockSession } = useAuth();
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
       {/* Subtle radial glow behind header */}
@@ -14,30 +21,49 @@ export default function Home() {
       </div>
 
       {/* Top Navbar */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/70 backdrop-blur-xl transition-all">
+      <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/70 backdrop-blur-xl transition-all print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B8962E] flex items-center justify-center shadow-lg shadow-primary/30">
               <span className="text-black font-bold text-xl leading-none tracking-tighter">W</span>
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground hidden sm:block">Walsong Jewellers</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground hidden sm:block">{profile.shop_name || "JwelFlow"}</h1>
           </div>
           <nav className="flex items-center gap-6 text-xs font-medium text-muted-foreground uppercase tracking-widest">
             <Link href="/pos" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <HandCoins className="w-3.5 h-3.5" /> Point of Sale
+              <HandCoins className="w-3.5 h-3.5" /> POS
             </Link>
             <Link href="/inventory" className="hover:text-primary transition-colors flex items-center gap-1.5">
               <Package className="w-3.5 h-3.5" /> Inventory
             </Link>
+            <Link href="/dhito" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <HandCoins className="w-3.5 h-3.5" /> Dhito
+            </Link>
+            <Link href="/customers" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" /> Customers
+            </Link>
+            <Link href="/reports" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" /> Reports
+            </Link>
+            <Link href="/settings" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <Settings className="w-3.5 h-3.5" /> Settings
+            </Link>
+            <div className="h-4 w-px bg-border/50 mx-1" />
+            <button onClick={lockSession} className="hover:text-destructive transition-colors flex items-center gap-1.5 font-bold">
+              <Lock className="w-3.5 h-3.5" /> Lock Session
+            </button>
           </nav>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-10 space-y-12 max-w-7xl relative z-10">
+      <main className="container mx-auto px-4 py-10 space-y-12 max-w-7xl relative z-10 print:hidden">
         {/* Welcome Section */}
-        <section className="space-y-2 pt-4">
-          <h2 className="text-4xl font-medium tracking-tight">JwelFlow Dashboard</h2>
-          <p className="text-muted-foreground text-lg">Manage inventory, process sales, and monitor real-time market rates.</p>
+        <section className="flex items-center justify-between pt-4">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-medium tracking-tight">JwelFlow Dashboard</h2>
+            <p className="text-muted-foreground text-lg">Manage inventory, process sales, and monitor real-time market rates.</p>
+          </div>
+          <EodModal />
         </section>
 
         {/* Daily Rates + Quick Actions */}
@@ -74,7 +100,7 @@ export default function Home() {
 
         {/* Secure Owner Sections */}
         <section className="pt-8 border-t border-border/20">
-          <PinLock>
+          <PinLock requiredRole="owner">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
 
               {/* Stock Overview */}
