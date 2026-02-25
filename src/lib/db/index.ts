@@ -1,7 +1,7 @@
 import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
-import { inventorySchema, dhitoSchema, ratesSchema, auditLogSchema, shopProfileSchema, customerSchema, staffSchema } from './schemas';
+import { inventorySchema, dhitoSchema, ratesSchema, auditLogSchema, shopProfileSchema, customerSchema, staffSchema, invoicesSchema } from './schemas';
 
 // Only add plugins once
 let pluginsAdded = false;
@@ -28,7 +28,8 @@ const createDB = async () => {
         audit_log: { schema: auditLogSchema },
         shop_profile: { schema: shopProfileSchema },
         customers: { schema: customerSchema },
-        staff: { schema: staffSchema }
+        staff: { schema: staffSchema },
+        invoices: { schema: invoicesSchema }
     });
 
     return db;
@@ -43,7 +44,7 @@ export const getDb = () => {
 
 export const resetDatabase = async () => {
     const db = await getDb();
-    const collections = ['inventory', 'dhito', 'rates', 'audit_log', 'customers', 'staff'];
+    const collections = ['inventory', 'dhito', 'rates', 'audit_log', 'customers', 'staff', 'invoices'];
 
     // Wipe all business data but keep ShopProfile for branding persistence
     for (const name of collections) {
@@ -66,7 +67,7 @@ export const resetDatabase = async () => {
 
 export const exportEncryptedBackup = async () => {
     const db = await getDb();
-    const collectionNames = ['inventory', 'dhito', 'rates', 'audit_log', 'shop_profile', 'customers', 'staff'];
+    const collectionNames = ['inventory', 'dhito', 'rates', 'audit_log', 'shop_profile', 'customers', 'staff', 'invoices'];
     const backup: Record<string, any[]> = {};
 
     for (const name of collectionNames) {

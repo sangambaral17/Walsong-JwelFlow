@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getDb } from "@/lib/db";
-import { toGrams, calculateFinalPrice, formatTML, toTolaMashaLal, GRAMS_PER_TOLA } from "@/lib/jewelry-math";
+import { toGrams, calculateFinalPrice, formatTML, toTolaMashaLal } from "@/lib/jewelry-math";
 import { useShop } from "@/lib/shop-context";
 import { useAuth } from "@/lib/auth-context";
 import Decimal from "decimal.js";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Scale, ShoppingCart, Printer, Plus, Minus, Trash2, QrCode, CheckCircle2, Usb, FileDown } from "lucide-react";
+import { ArrowLeft, Scale, ShoppingCart, Printer, Plus, Trash2, QrCode, CheckCircle2, Usb, User, Search, X } from "lucide-react";
 import Link from "next/link";
 
 interface CartItem {
@@ -28,14 +28,22 @@ interface CartItem {
     total: string;
 }
 
+interface CustomerInfo {
+    name: string;
+    phone: string;
+    address: string;
+}
+
 interface InvoiceData {
     id: string;
     date: string;
+    customer: CustomerInfo;
     items: CartItem[];
     subtotal: string;
     vatAmount: string;
     grandTotal: string;
     cashier: string;
+    paymentMethod: string;
 }
 
 export default function POSPage() {
@@ -48,6 +56,13 @@ export default function POSPage() {
     const [scaleConnected, setScaleConnected] = useState(false);
     const [showInvoice, setShowInvoice] = useState(false);
     const [lastInvoice, setLastInvoice] = useState<InvoiceData | null>(null);
+
+    // Customer state
+    const [customer, setCustomer] = useState<CustomerInfo>({ name: "", phone: "", address: "" });
+    const [customerSearch, setCustomerSearch] = useState("");
+    const [customerResults, setCustomerResults] = useState<any[]>([]);
+    const [showCustomerPanel, setShowCustomerPanel] = useState(true);
+    const [paymentMethod, setPaymentMethod] = useState("cash");
 
     // Form for adding items
     const [form, setForm] = useState({
@@ -65,6 +80,30 @@ export default function POSPage() {
             }
         })();
     }, []);
+
+    // Search existing customers
+    useEffect(() => {
+        if (!customerSearch.trim()) {
+            setCustomerResults([]);
+            return;
+        }
+        const search = async () => {
+            const db = await getDb();
+            const all = await db.customers.find().exec();
+            const q = customerSearch.toLowerCase();
+            const filtered = all
+                .map((d: any) => d.toJSON())
+                .filter((c: any) => c.name?.toLowerCase().includes(q) || c.phone?.includes(q));
+            setCustomerResults(filtered.slice(0, 5));
+        };
+        search();
+    }, [customerSearch]);
+
+    const selectCustomer = (c: any) => {
+        setCustomer({ name: c.name, phone: c.phone || "", address: c.address || "" });
+        setCustomerSearch("");
+        setCustomerResults([]);
+    };
 
     const handleCaptureWeight = async () => {
         try {
@@ -94,6 +133,10 @@ export default function POSPage() {
             masha: Number(form.masha) || 0,
             lal: Number(form.lal) || 0,
         });
+        if (weightGrams.lte(0)) {
+            alert("Please enter the weight before adding to cart.");
+            return;
+        }
         const rate = form.category === "Silver" ? silverRate : goldRate;
         const pricing = calculateFinalPrice({
             ratePerTola: rate,
@@ -123,10 +166,19 @@ export default function POSPage() {
     const grandTotal = cart.reduce((acc, item) => acc.plus(new Decimal(item.total)), new Decimal(0));
 
     const handleCheckout = async () => {
+        if (!customer.name.trim()) {
+            alert("Please enter customer name before generating invoice.");
+            return;
+        }
+        if (cart.length === 0) {
+            alert("Cart is empty. Add items before checkout.");
+            return;
+        }
+
         const db = await getDb();
         const invoiceId = `INV-${Date.now().toString(36).toUpperCase()}`;
 
-        // Calculate true totals for the invoice
+        // Calculate true totals
         let totalSubtotal = new Decimal(0);
         let totalVat = new Decimal(0);
 
@@ -147,6 +199,7 @@ export default function POSPage() {
                 action: "SALE",
                 details: JSON.stringify({
                     invoice_id: invoiceId,
+                    customer: customer.name,
                     item: item.name,
                     category: item.category,
                     weight_grams: item.weightGrams,
@@ -160,15 +213,50 @@ export default function POSPage() {
             });
         }
 
-        setLastInvoice({
+        const invoiceData: InvoiceData = {
             id: invoiceId,
             date: new Date().toISOString(),
+            customer: { ...customer },
             items: [...cart],
             subtotal: totalSubtotal.toFixed(2),
             vatAmount: totalVat.toFixed(2),
             grandTotal: grandTotal.toFixed(2),
             cashier: user?.name || "Staff",
+            paymentMethod,
+        };
+
+        // Save invoice to DB for history
+        await db.invoices.insert({
+            id: invoiceId,
+            date: invoiceData.date,
+            customer_name: customer.name,
+            customer_phone: customer.phone,
+            customer_address: customer.address,
+            items: JSON.stringify(cart),
+            subtotal: totalSubtotal.toNumber(),
+            vat_amount: totalVat.toNumber(),
+            grand_total: grandTotal.toNumber(),
+            cashier: invoiceData.cashier,
+            payment_method: paymentMethod,
+            notes: "",
         });
+
+        // Save new customer if not already in DB
+        if (customer.name.trim()) {
+            const exists = await db.customers.find({ selector: { name: customer.name } }).exec();
+            if (exists.length === 0) {
+                await db.customers.insert({
+                    id: crypto.randomUUID(),
+                    name: customer.name,
+                    phone: customer.phone,
+                    address: customer.address,
+                    notes: "",
+                    created_at: new Date().toISOString(),
+                });
+            }
+        }
+
+        setLastInvoice(invoiceData);
         setShowInvoice(true);
         setCart([]);
     };
@@ -193,45 +281,31 @@ export default function POSPage() {
     return (
         <div className="min-h-screen bg-background text-foreground">
 
-            {/* === PRINT-ONLY INVOICE (hidden on screen, shown on print/PDF) === */}
+            {/* === PRINT-ONLY INVOICE === */}
             {lastInvoice && (
                 <div className="hidden print:block" id="printable-invoice">
                     <style>{`
                         @media print {
                             @page { size: A5; margin: 12mm; }
                             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            .no-print { display: none !important; }
+                            .no-print, header.no-print, main.no-print, [role="dialog"] { display: none !important; }
                             #printable-invoice { display: block !important; font-family: 'Segoe UI', Arial, sans-serif; color: #000; font-size: 11px; }
                             #printable-invoice * { box-sizing: border-box; }
-                            .inv-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
-                            .inv-header h1 { font-size: 18px; font-weight: 800; margin: 0; letter-spacing: 1px; }
-                            .inv-header p { margin: 2px 0; font-size: 10px; color: #444; }
-                            .inv-meta { display: flex; justify-content: space-between; font-size: 10px; padding: 6px 0; border-bottom: 1px solid #ccc; margin-bottom: 8px; }
-                            .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-                            .inv-table th { background: #f3f3f3; text-align: left; padding: 6px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #000; }
-                            .inv-table td { padding: 5px 8px; border-bottom: 1px solid #eee; font-size: 10px; }
-                            .inv-table .text-right { text-align: right; }
-                            .inv-table .font-mono { font-family: 'Courier New', monospace; }
-                            .inv-totals { margin-top: 8px; border-top: 2px solid #000; padding-top: 8px; }
-                            .inv-totals .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
-                            .inv-totals .row.grand { font-size: 14px; font-weight: 800; border-top: 1px solid #000; padding-top: 6px; margin-top: 4px; }
-                            .inv-footer { text-align: center; margin-top: 16px; padding-top: 8px; border-top: 1px dashed #999; font-size: 9px; color: #666; }
-                            .inv-qr { text-align: center; margin-top: 12px; }
-                            .inv-qr-box { width: 60px; height: 60px; border: 1px solid #ccc; display: inline-flex; align-items: center; justify-content: center; }
                         }
                     `}</style>
 
-                    <div className="inv-header">
-                        <h1>✦ {profile.shop_name || "Walsong Jewellers"} ✦</h1>
-                        <p>{profile.address || "Kathmandu, Nepal"}</p>
-                        <p>PAN/VAT: {profile.pan_vat_number || "N/A"} &nbsp;•&nbsp; Phone: {profile.phone || "N/A"}</p>
-                        <p style={{ fontWeight: 700, marginTop: 4, fontSize: 12 }}>TAX INVOICE</p>
+                    <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 8 }}>
+                        <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 1 }}>✦ {profile.shop_name || "Walsong Jewellers"} ✦</h1>
+                        <p style={{ margin: "2px 0", fontSize: 10, color: "#444" }}>{profile.address || "Kathmandu, Nepal"}</p>
+                        <p style={{ margin: "2px 0", fontSize: 10, color: "#444" }}>PAN/VAT: {profile.pan_vat_number || "N/A"} &nbsp;•&nbsp; Phone: {profile.phone || "N/A"}</p>
+                        <p style={{ fontWeight: 700, marginTop: 6, fontSize: 13, letterSpacing: 2 }}>TAX INVOICE</p>
                     </div>
 
-                    <div className="inv-meta">
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, padding: "6px 0", borderBottom: "1px solid #ccc", marginBottom: 8 }}>
                         <div>
                             <strong>Invoice #:</strong> {lastInvoice.id}<br />
-                            <strong>Cashier:</strong> {lastInvoice.cashier}
+                            <strong>Cashier:</strong> {lastInvoice.cashier}<br />
+                            <strong>Payment:</strong> {lastInvoice.paymentMethod.toUpperCase()}
                         </div>
                         <div style={{ textAlign: "right" }}>
                             <strong>Date:</strong> {new Date(lastInvoice.date).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}<br />
@@ -239,58 +313,61 @@ export default function POSPage() {
                         </div>
                     </div>
 
-                    <table className="inv-table">
+                    {/* Customer Box */}
+                    <div style={{ border: "1px solid #ccc", padding: "6px 10px", marginBottom: 10, fontSize: 10 }}>
+                        <strong>Bill To:</strong><br />
+                        <span style={{ fontSize: 12, fontWeight: 700 }}>{lastInvoice.customer.name}</span><br />
+                        {lastInvoice.customer.phone && <span>Phone: {lastInvoice.customer.phone}<br /></span>}
+                        {lastInvoice.customer.address && <span>Address: {lastInvoice.customer.address}</span>}
+                    </div>
+
+                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 8 }}>
                         <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Item</th>
-                                <th>Type</th>
-                                <th>Weight</th>
-                                <th>Rate/T</th>
-                                <th className="text-right">Jarti</th>
-                                <th className="text-right">Jyala</th>
-                                <th className="text-right">Amount</th>
+                            <tr style={{ background: "#f3f3f3" }}>
+                                <th style={{ textAlign: "left", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>#</th>
+                                <th style={{ textAlign: "left", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Item</th>
+                                <th style={{ textAlign: "left", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Type</th>
+                                <th style={{ textAlign: "left", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Weight</th>
+                                <th style={{ textAlign: "right", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Rate/T</th>
+                                <th style={{ textAlign: "right", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Jarti</th>
+                                <th style={{ textAlign: "right", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Jyala</th>
+                                <th style={{ textAlign: "right", padding: "6px 6px", fontSize: 9, borderBottom: "2px solid #000" }}>Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             {lastInvoice.items.map((item, i) => {
                                 const tml = toTolaMashaLal(item.weightGrams);
-                                const pricing = calculateFinalPrice({
-                                    ratePerTola: item.ratePerTola,
-                                    weightGrams: item.weightGrams,
-                                    wastageAmount: item.wastage,
-                                    makingCharge: item.making,
-                                });
+                                const pricing = calculateFinalPrice({ ratePerTola: item.ratePerTola, weightGrams: item.weightGrams, wastageAmount: item.wastage, makingCharge: item.making });
                                 return (
                                     <tr key={i}>
-                                        <td>{i + 1}</td>
-                                        <td><strong>{item.name}</strong></td>
-                                        <td>{item.category}</td>
-                                        <td className="font-mono">{formatTML(tml)} <span style={{ fontSize: 8, color: "#888" }}>({item.weightGrams.toFixed(2)}g)</span></td>
-                                        <td className="font-mono">रू{item.ratePerTola.toLocaleString()}</td>
-                                        <td className="text-right font-mono">रू{item.wastage.toLocaleString()}</td>
-                                        <td className="text-right font-mono">रू{item.making.toLocaleString()}</td>
-                                        <td className="text-right font-mono"><strong>रू{pricing.subtotal.toFixed(2)}</strong></td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10 }}>{i + 1}</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10, fontWeight: 600 }}>{item.name}</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10 }}>{item.category}</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10, fontFamily: "monospace" }}>{formatTML(tml)} ({item.weightGrams.toFixed(2)}g)</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10, textAlign: "right", fontFamily: "monospace" }}>रू{item.ratePerTola.toLocaleString()}</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10, textAlign: "right", fontFamily: "monospace" }}>रू{item.wastage.toLocaleString()}</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10, textAlign: "right", fontFamily: "monospace" }}>रू{item.making.toLocaleString()}</td>
+                                        <td style={{ padding: "4px 6px", borderBottom: "1px solid #eee", fontSize: 10, textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>रू{pricing.subtotal.toFixed(2)}</td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                     </table>
 
-                    <div className="inv-totals">
-                        <div className="row"><span>Subtotal (before VAT)</span><span className="font-mono">रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-                        <div className="row"><span>VAT (13%)</span><span className="font-mono">रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-                        <div className="row grand"><span>GRAND TOTAL</span><span className="font-mono">रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                    <div style={{ borderTop: "2px solid #000", paddingTop: 8, marginTop: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 11 }}><span>Subtotal (before VAT)</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 11 }}><span>VAT (13%)</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0 0", fontSize: 15, fontWeight: 800, borderTop: "1px solid #000", marginTop: 4 }}><span>GRAND TOTAL</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                     </div>
 
-                    <div className="inv-qr">
-                        <div className="inv-qr-box">
+                    <div style={{ textAlign: "center", marginTop: 16 }}>
+                        <div style={{ width: 60, height: 60, border: "1px solid #ccc", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                             <QrCode style={{ width: 40, height: 40, color: "#999" }} />
                         </div>
                         <p style={{ fontSize: 8, color: "#aaa", marginTop: 4 }}>IRD Verification QR</p>
                     </div>
 
-                    <div className="inv-footer">
+                    <div style={{ textAlign: "center", marginTop: 12, paddingTop: 8, borderTop: "1px dashed #999", fontSize: 9, color: "#666" }}>
                         <p>{profile.invoice_footer || "Thank you for your business!"}</p>
                         <p style={{ marginTop: 4 }}>Powered by Walsong JwelFlow ERP • © {new Date().getFullYear()}</p>
                     </div>
@@ -312,6 +389,11 @@ export default function POSPage() {
                         </h1>
                     </div>
                     <div className="flex items-center gap-4">
+                        <Link href="/sales">
+                            <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10">
+                                Sales History
+                            </Button>
+                        </Link>
                         <Badge variant="outline" className="border-primary/30 text-primary font-mono">
                             Gold: रू {goldRate.toLocaleString()}/T
                         </Badge>
@@ -325,8 +407,78 @@ export default function POSPage() {
             <main className="container mx-auto px-4 py-8 max-w-7xl no-print">
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
-                    {/* LEFT: Item Entry */}
+                    {/* LEFT: Customer + Item Entry */}
                     <div className="lg:col-span-3 space-y-6">
+
+                        {/* Customer Details Card */}
+                        <div className="glass-card rounded-xl p-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                                    <User className="w-5 h-5 text-primary" /> Customer Details
+                                </h2>
+                                {customer.name && (
+                                    <Button variant="ghost" size="sm" onClick={() => setCustomer({ name: "", phone: "", address: "" })} className="text-muted-foreground hover:text-destructive">
+                                        <X className="w-4 h-4 mr-1" /> Clear
+                                    </Button>
+                                )}
+                            </div>
+
+                            {/* Search existing customers */}
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search existing customer by name or phone..."
+                                    value={customerSearch}
+                                    onChange={e => setCustomerSearch(e.target.value)}
+                                    className="pl-10 bg-background/50"
+                                />
+                                {customerResults.length > 0 && (
+                                    <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-xl max-h-48 overflow-auto">
+                                        {customerResults.map((c: any) => (
+                                            <button
+                                                key={c.id}
+                                                onClick={() => selectCustomer(c)}
+                                                className="w-full text-left px-4 py-3 hover:bg-primary/10 border-b border-border/30 last:border-0 transition-colors"
+                                            >
+                                                <p className="font-medium text-sm">{c.name}</p>
+                                                <p className="text-xs text-muted-foreground">{c.phone || "No phone"} • {c.address || "No address"}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Customer Name <span className="text-destructive">*</span></Label>
+                                    <Input value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} className="mt-1 bg-background/50" placeholder="Enter name" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Phone</Label>
+                                    <Input value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} className="mt-1 bg-background/50" placeholder="98XXXXXXXX" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Address</Label>
+                                    <Input value={customer.address} onChange={e => setCustomer({ ...customer, address: e.target.value })} className="mt-1 bg-background/50" placeholder="Kathmandu" />
+                                </div>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div className="flex items-center gap-3">
+                                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Payment:</Label>
+                                {["cash", "bank", "credit"].map(m => (
+                                    <button
+                                        key={m}
+                                        onClick={() => setPaymentMethod(m)}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${paymentMethod === m ? "bg-primary text-primary-foreground border-primary shadow-md" : "bg-background/50 text-muted-foreground border-border hover:border-primary/40"}`}
+                                    >
+                                        {m === "cash" ? "💵 Cash" : m === "bank" ? "🏦 Bank Transfer" : "📝 Credit"}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Item Entry Card */}
                         <div className="glass-card rounded-xl p-6 space-y-5">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-semibold tracking-tight">New Item Entry</h2>
@@ -352,7 +504,6 @@ export default function POSPage() {
 
                             <Separator className="bg-border/30" />
 
-                            {/* Weight Input: Tola-Masha-Lal */}
                             <div>
                                 <Label className="text-xs uppercase tracking-wider text-primary mb-2 block">Weight (Tola - Masha - Lal)</Label>
                                 <div className="grid grid-cols-3 gap-4">
@@ -381,7 +532,6 @@ export default function POSPage() {
 
                             <Separator className="bg-border/30" />
 
-                            {/* Charges */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label className="text-xs uppercase tracking-wider text-muted-foreground">Jarti (Wastage) रू</Label>
@@ -463,6 +613,14 @@ export default function POSPage() {
                                 </div>
                             )}
 
+                            {/* Customer summary in cart */}
+                            {customer.name && (
+                                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-sm">
+                                    <p className="font-medium"><User className="w-3 h-3 inline mr-1" /> {customer.name}</p>
+                                    {customer.phone && <p className="text-xs text-muted-foreground">{customer.phone}</p>}
+                                </div>
+                            )}
+
                             {cart.length > 0 && (
                                 <>
                                     <Separator className="bg-border/30" />
@@ -470,9 +628,16 @@ export default function POSPage() {
                                         <span className="text-lg font-semibold">Grand Total</span>
                                         <span className="text-2xl font-bold text-primary font-mono">रू {grandTotal.toFixed(2)}</span>
                                     </div>
-                                    <Button onClick={handleCheckout} className="w-full bg-gradient-to-r from-primary to-[#B8962E] text-primary-foreground h-12 text-base shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50">
-                                        <CheckCircle2 className="w-5 h-5 mr-2" /> Complete Sale & Generate Invoice
+                                    <Button
+                                        onClick={handleCheckout}
+                                        disabled={!customer.name.trim()}
+                                        className="w-full bg-gradient-to-r from-primary to-[#B8962E] text-primary-foreground h-12 text-base shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <CheckCircle2 className="w-5 h-5 mr-2" /> Generate Invoice
                                     </Button>
+                                    {!customer.name.trim() && (
+                                        <p className="text-xs text-destructive text-center animate-pulse">⚠ Enter customer name to proceed</p>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -489,7 +654,6 @@ export default function POSPage() {
                     </DialogHeader>
                     {lastInvoice && (
                         <div className="p-5 pt-3 text-sm text-black">
-                            {/* Invoice Preview */}
                             <div className="border border-gray-200 rounded-lg p-5 space-y-4 bg-white">
                                 {/* Header */}
                                 <div className="text-center border-b-2 border-black pb-3">
@@ -499,15 +663,19 @@ export default function POSPage() {
                                     <p className="font-bold text-xs mt-2 tracking-[0.2em] uppercase">Tax Invoice</p>
                                 </div>
 
-                                {/* Meta */}
-                                <div className="flex justify-between text-xs text-gray-600 border-b border-gray-200 pb-3">
+                                {/* Meta + Customer */}
+                                <div className="grid grid-cols-2 gap-4 text-xs border-b border-gray-200 pb-3">
                                     <div>
                                         <p><strong>Invoice #:</strong> {lastInvoice.id}</p>
-                                        <p><strong>Cashier:</strong> {lastInvoice.cashier}</p>
-                                    </div>
-                                    <div className="text-right">
                                         <p><strong>Date:</strong> {new Date(lastInvoice.date).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}</p>
-                                        <p><strong>Time:</strong> {new Date(lastInvoice.date).toLocaleTimeString("en-NP", { hour: "2-digit", minute: "2-digit" })}</p>
+                                        <p><strong>Cashier:</strong> {lastInvoice.cashier}</p>
+                                        <p><strong>Payment:</strong> {lastInvoice.paymentMethod.toUpperCase()}</p>
+                                    </div>
+                                    <div className="border-l border-gray-200 pl-4">
+                                        <p className="font-semibold text-gray-700 mb-1">Bill To:</p>
+                                        <p className="font-bold text-sm">{lastInvoice.customer.name}</p>
+                                        {lastInvoice.customer.phone && <p>Phone: {lastInvoice.customer.phone}</p>}
+                                        {lastInvoice.customer.address && <p>Address: {lastInvoice.customer.address}</p>}
                                     </div>
                                 </div>
 
@@ -528,12 +696,7 @@ export default function POSPage() {
                                     <tbody>
                                         {lastInvoice.items.map((item, i) => {
                                             const tml = toTolaMashaLal(item.weightGrams);
-                                            const pricing = calculateFinalPrice({
-                                                ratePerTola: item.ratePerTola,
-                                                weightGrams: item.weightGrams,
-                                                wastageAmount: item.wastage,
-                                                makingCharge: item.making,
-                                            });
+                                            const pricing = calculateFinalPrice({ ratePerTola: item.ratePerTola, weightGrams: item.weightGrams, wastageAmount: item.wastage, makingCharge: item.making });
                                             return (
                                                 <tr key={i} className="border-b border-gray-100">
                                                     <td className="p-2 text-gray-500">{i + 1}</td>
@@ -552,18 +715,9 @@ export default function POSPage() {
 
                                 {/* Totals */}
                                 <div className="border-t-2 border-black pt-3 space-y-1">
-                                    <div className="flex justify-between text-sm">
-                                        <span>Subtotal</span>
-                                        <span className="font-mono">रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span>VAT (13%)</span>
-                                        <span className="font-mono">रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between text-base font-extrabold border-t border-black pt-2 mt-2">
-                                        <span>GRAND TOTAL</span>
-                                        <span className="font-mono text-lg">रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                    </div>
+                                    <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-mono">रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                    <div className="flex justify-between text-sm"><span>VAT (13%)</span><span className="font-mono">रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                    <div className="flex justify-between text-base font-extrabold border-t border-black pt-2 mt-2"><span>GRAND TOTAL</span><span className="font-mono text-lg">रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                                 </div>
 
                                 {/* QR + Footer */}

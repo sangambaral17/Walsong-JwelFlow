@@ -123,3 +123,26 @@ export const staffSchema: RxJsonSchema<any> = {
     },
     required: ['id', 'name', 'pin', 'role', 'active']
 };
+
+export const invoicesSchema: RxJsonSchema<any> = {
+    title: 'invoices schema',
+    version: 0,
+    description: 'completed sale invoices with full detail',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        date: { type: 'string' },
+        customer_name: { type: 'string' },
+        customer_phone: { type: 'string' },
+        customer_address: { type: 'string' },
+        items: { type: 'string' }, // JSON stringified CartItem[]
+        subtotal: { type: 'number' },
+        vat_amount: { type: 'number' },
+        grand_total: { type: 'number' },
+        cashier: { type: 'string' },
+        payment_method: { type: 'string' }, // 'cash', 'bank', 'credit'
+        notes: { type: 'string' }
+    },
+    required: ['id', 'date', 'grand_total', 'cashier']
+};
