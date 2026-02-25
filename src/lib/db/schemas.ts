@@ -1,0 +1,71 @@
+import { RxJsonSchema } from 'rxdb';
+
+export const inventorySchema: RxJsonSchema<any> = {
+    title: 'inventory schema',
+    version: 0,
+    description: 'describes an inventory item',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        name: { type: 'string' },
+        category: { type: 'string' },
+        weight_tola: { type: 'number' },
+        weight_masha: { type: 'number' },
+        weight_lal: { type: 'number' },
+        net_weight_grams: { type: 'number' },
+        jarti: { type: 'number' },
+        jyala: { type: 'number' },
+        created_at: { type: 'string' },
+    },
+    required: ['id', 'name', 'category', 'net_weight_grams', 'created_at']
+};
+
+export const dhitoSchema: RxJsonSchema<any> = {
+    title: 'dhito schema',
+    version: 0,
+    description: 'describes a pawned item (dhito)',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        customer_name: { type: 'string' },
+        item_description: { type: 'string' },
+        weight_grams: { type: 'number' },
+        loan_amount: { type: 'number' },
+        interest_rate: { type: 'number' },
+        date_pawned: { type: 'string' },
+        status: { type: 'string' }
+    },
+    required: ['id', 'customer_name', 'item_description', 'loan_amount', 'date_pawned']
+};
+
+export const ratesSchema: RxJsonSchema<any> = {
+    title: 'rates schema',
+    version: 0,
+    description: 'daily rates for gold and silver',
+    primaryKey: 'date',
+    type: 'object',
+    properties: {
+        date: { type: 'string', maxLength: 100 },
+        gold_tola_rate: { type: 'number' },
+        silver_tola_rate: { type: 'number' }
+    },
+    required: ['date', 'gold_tola_rate', 'silver_tola_rate']
+};
+
+export const auditLogSchema: RxJsonSchema<any> = {
+    title: 'audit log schema',
+    version: 0,
+    description: 'IRD compliance non-editable audit log',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        timestamp: { type: 'string' },
+        action: { type: 'string' },
+        details: { type: 'string' },
+        user: { type: 'string' }
+    },
+    required: ['id', 'timestamp', 'action', 'details']
+};
