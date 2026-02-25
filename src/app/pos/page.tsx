@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getDb } from "@/lib/db";
-import { toGrams, calculateFinalPrice, formatTML, toTolaMashaLal } from "@/lib/jewelry-math";
+import { toGrams, calculateFinalPrice, formatTML, toTolaMashaLal, GRAMS_PER_TOLA } from "@/lib/jewelry-math";
+import { useShop } from "@/lib/shop-context";
+import { useAuth } from "@/lib/auth-context";
 import Decimal from "decimal.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Scale, ShoppingCart, Printer, Plus, Minus, Trash2, QrCode, CheckCircle2, Usb } from "lucide-react";
+import { ArrowLeft, Scale, ShoppingCart, Printer, Plus, Minus, Trash2, QrCode, CheckCircle2, Usb, FileDown } from "lucide-react";
 import Link from "next/link";
 
 interface CartItem {
@@ -26,14 +28,26 @@ interface CartItem {
     total: string;
 }
 
+interface InvoiceData {
+    id: string;
+    date: string;
+    items: CartItem[];
+    subtotal: string;
+    vatAmount: string;
+    grandTotal: string;
+    cashier: string;
+}
+
 export default function POSPage() {
+    const { profile } = useShop();
+    const { user } = useAuth();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [goldRate, setGoldRate] = useState(314800);
     const [silverRate, setSilverRate] = useState(4200);
     const [scaleWeight, setScaleWeight] = useState<number | null>(null);
     const [scaleConnected, setScaleConnected] = useState(false);
     const [showInvoice, setShowInvoice] = useState(false);
-    const [lastInvoice, setLastInvoice] = useState<any>(null);
+    const [lastInvoice, setLastInvoice] = useState<InvoiceData | null>(null);
 
     // Form for adding items
     const [form, setForm] = useState({
@@ -110,15 +124,29 @@ export default function POSPage() {
 
     const handleCheckout = async () => {
         const db = await getDb();
+        const invoiceId = `INV-${Date.now().toString(36).toUpperCase()}`;
 
-        // Deduct from inventory if matching items exist
+        // Calculate true totals for the invoice
+        let totalSubtotal = new Decimal(0);
+        let totalVat = new Decimal(0);
+
         for (const item of cart) {
-            // Write immutable audit log entry for each sale
+            const pricing = calculateFinalPrice({
+                ratePerTola: item.ratePerTola,
+                weightGrams: item.weightGrams,
+                wastageAmount: item.wastage,
+                makingCharge: item.making,
+            });
+            totalSubtotal = totalSubtotal.plus(pricing.subtotal);
+            totalVat = totalVat.plus(pricing.vatAmount);
+
+            // Write immutable audit log entry for each sale item
             await db.audit_log.insert({
                 id: crypto.randomUUID(),
                 timestamp: new Date().toISOString(),
                 action: "SALE",
                 details: JSON.stringify({
+                    invoice_id: invoiceId,
                     item: item.name,
                     category: item.category,
                     weight_grams: item.weightGrams,
@@ -126,19 +154,27 @@ export default function POSPage() {
                     wastage: item.wastage,
                     making: item.making,
                     total: item.total,
+                    total_amount: Number(item.total),
                 }),
-                user: "staff",
+                user: user?.name || "staff",
             });
         }
 
         setLastInvoice({
-            id: `INV-${Date.now().toString(36).toUpperCase()}`,
+            id: invoiceId,
             date: new Date().toISOString(),
             items: [...cart],
+            subtotal: totalSubtotal.toFixed(2),
+            vatAmount: totalVat.toFixed(2),
             grandTotal: grandTotal.toFixed(2),
+            cashier: user?.name || "Staff",
         });
         setShowInvoice(true);
         setCart([]);
+    };
+
+    const handlePrintInvoice = () => {
+        window.print();
     };
 
     const currentWeightGrams = toGrams({
@@ -156,6 +192,111 @@ export default function POSPage() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
+
+            {/* === PRINT-ONLY INVOICE (hidden on screen, shown on print/PDF) === */}
+            {lastInvoice && (
+                <div className="hidden print:block" id="printable-invoice">
+                    <style>{`
+                        @media print {
+                            @page { size: A5; margin: 12mm; }
+                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .no-print { display: none !important; }
+                            #printable-invoice { display: block !important; font-family: 'Segoe UI', Arial, sans-serif; color: #000; font-size: 11px; }
+                            #printable-invoice * { box-sizing: border-box; }
+                            .inv-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+                            .inv-header h1 { font-size: 18px; font-weight: 800; margin: 0; letter-spacing: 1px; }
+                            .inv-header p { margin: 2px 0; font-size: 10px; color: #444; }
+                            .inv-meta { display: flex; justify-content: space-between; font-size: 10px; padding: 6px 0; border-bottom: 1px solid #ccc; margin-bottom: 8px; }
+                            .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+                            .inv-table th { background: #f3f3f3; text-align: left; padding: 6px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #000; }
+                            .inv-table td { padding: 5px 8px; border-bottom: 1px solid #eee; font-size: 10px; }
+                            .inv-table .text-right { text-align: right; }
+                            .inv-table .font-mono { font-family: 'Courier New', monospace; }
+                            .inv-totals { margin-top: 8px; border-top: 2px solid #000; padding-top: 8px; }
+                            .inv-totals .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
+                            .inv-totals .row.grand { font-size: 14px; font-weight: 800; border-top: 1px solid #000; padding-top: 6px; margin-top: 4px; }
+                            .inv-footer { text-align: center; margin-top: 16px; padding-top: 8px; border-top: 1px dashed #999; font-size: 9px; color: #666; }
+                            .inv-qr { text-align: center; margin-top: 12px; }
+                            .inv-qr-box { width: 60px; height: 60px; border: 1px solid #ccc; display: inline-flex; align-items: center; justify-content: center; }
+                        }
+                    `}</style>
+
+                    <div className="inv-header">
+                        <h1>✦ {profile.shop_name || "Walsong Jewellers"} ✦</h1>
+                        <p>{profile.address || "Kathmandu, Nepal"}</p>
+                        <p>PAN/VAT: {profile.pan_vat_number || "N/A"} &nbsp;•&nbsp; Phone: {profile.phone || "N/A"}</p>
+                        <p style={{ fontWeight: 700, marginTop: 4, fontSize: 12 }}>TAX INVOICE</p>
+                    </div>
+
+                    <div className="inv-meta">
+                        <div>
+                            <strong>Invoice #:</strong> {lastInvoice.id}<br />
+                            <strong>Cashier:</strong> {lastInvoice.cashier}
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                            <strong>Date:</strong> {new Date(lastInvoice.date).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}<br />
+                            <strong>Time:</strong> {new Date(lastInvoice.date).toLocaleTimeString("en-NP", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                    </div>
+
+                    <table className="inv-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Item</th>
+                                <th>Type</th>
+                                <th>Weight</th>
+                                <th>Rate/T</th>
+                                <th className="text-right">Jarti</th>
+                                <th className="text-right">Jyala</th>
+                                <th className="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {lastInvoice.items.map((item, i) => {
+                                const tml = toTolaMashaLal(item.weightGrams);
+                                const pricing = calculateFinalPrice({
+                                    ratePerTola: item.ratePerTola,
+                                    weightGrams: item.weightGrams,
+                                    wastageAmount: item.wastage,
+                                    makingCharge: item.making,
+                                });
+                                return (
+                                    <tr key={i}>
+                                        <td>{i + 1}</td>
+                                        <td><strong>{item.name}</strong></td>
+                                        <td>{item.category}</td>
+                                        <td className="font-mono">{formatTML(tml)} <span style={{ fontSize: 8, color: "#888" }}>({item.weightGrams.toFixed(2)}g)</span></td>
+                                        <td className="font-mono">रू{item.ratePerTola.toLocaleString()}</td>
+                                        <td className="text-right font-mono">रू{item.wastage.toLocaleString()}</td>
+                                        <td className="text-right font-mono">रू{item.making.toLocaleString()}</td>
+                                        <td className="text-right font-mono"><strong>रू{pricing.subtotal.toFixed(2)}</strong></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+
+                    <div className="inv-totals">
+                        <div className="row"><span>Subtotal (before VAT)</span><span className="font-mono">रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div className="row"><span>VAT (13%)</span><span className="font-mono">रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div className="row grand"><span>GRAND TOTAL</span><span className="font-mono">रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                    </div>
+
+                    <div className="inv-qr">
+                        <div className="inv-qr-box">
+                            <QrCode style={{ width: 40, height: 40, color: "#999" }} />
+                        </div>
+                        <p style={{ fontSize: 8, color: "#aaa", marginTop: 4 }}>IRD Verification QR</p>
+                    </div>
+
+                    <div className="inv-footer">
+                        <p>{profile.invoice_footer || "Thank you for your business!"}</p>
+                        <p style={{ marginTop: 4 }}>Powered by Walsong JwelFlow ERP • © {new Date().getFullYear()}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Top bar */}
             <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl no-print">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -259,11 +400,11 @@ export default function POSPage() {
                                     <span className="font-mono">रू {livePrice.basePrice.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-muted-foreground">
-                                    <span>+ Wastage</span>
+                                    <span>+ Jarti (Wastage)</span>
                                     <span className="font-mono">रू {livePrice.wastage.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-muted-foreground">
-                                    <span>+ Making Charge</span>
+                                    <span>+ Jyala (Making)</span>
                                     <span className="font-mono">रू {livePrice.making.toFixed(2)}</span>
                                 </div>
                                 <Separator className="bg-primary/10" />
@@ -330,7 +471,7 @@ export default function POSPage() {
                                         <span className="text-2xl font-bold text-primary font-mono">रू {grandTotal.toFixed(2)}</span>
                                     </div>
                                     <Button onClick={handleCheckout} className="w-full bg-gradient-to-r from-primary to-[#B8962E] text-primary-foreground h-12 text-base shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50">
-                                        <CheckCircle2 className="w-5 h-5 mr-2" /> Complete Sale & Print Invoice
+                                        <CheckCircle2 className="w-5 h-5 mr-2" /> Complete Sale & Generate Invoice
                                     </Button>
                                 </>
                             )}
@@ -339,61 +480,110 @@ export default function POSPage() {
                 </div>
             </main>
 
-            {/* Invoice Modal */}
+            {/* Invoice Preview Modal */}
             <Dialog open={showInvoice} onOpenChange={setShowInvoice}>
-                <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-white text-black">
-                    <DialogHeader className="p-4 pb-0">
-                        <DialogTitle className="text-center text-lg font-bold">Sale Complete</DialogTitle>
-                        <DialogDescription className="text-center text-sm text-gray-500">Your invoice is ready to print.</DialogDescription>
+                <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-white text-black max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="p-5 pb-0">
+                        <DialogTitle className="text-center text-lg font-bold text-black">Invoice Generated Successfully</DialogTitle>
+                        <DialogDescription className="text-center text-sm text-gray-500">Review below and print to PDF or paper.</DialogDescription>
                     </DialogHeader>
                     {lastInvoice && (
-                        <div id="invoice-print" className="p-4 text-sm" style={{ width: "80mm", margin: "0 auto" }}>
-                            {/* Receipt Header */}
-                            <div className="text-center mb-3">
-                                <h3 className="font-bold text-base">✦ Walsong Jewellers ✦</h3>
-                                <p className="text-xs text-gray-500">Kathmandu, Nepal • PAN: 123456789</p>
-                                <p className="text-xs text-gray-500">Phone: +977-1-XXXXXXX</p>
-                            </div>
-                            <div className="border-t border-dashed border-gray-300 my-2" />
-                            <div className="flex justify-between text-xs text-gray-500">
-                                <span>Invoice: {lastInvoice.id}</span>
-                                <span>{new Date(lastInvoice.date).toLocaleDateString("ne-NP")}</span>
-                            </div>
-                            <div className="border-t border-dashed border-gray-300 my-2" />
+                        <div className="p-5 pt-3 text-sm text-black">
+                            {/* Invoice Preview */}
+                            <div className="border border-gray-200 rounded-lg p-5 space-y-4 bg-white">
+                                {/* Header */}
+                                <div className="text-center border-b-2 border-black pb-3">
+                                    <h3 className="font-extrabold text-xl tracking-wide">{profile.shop_name || "Walsong Jewellers"}</h3>
+                                    <p className="text-xs text-gray-500">{profile.address || "Kathmandu, Nepal"}</p>
+                                    <p className="text-xs text-gray-500">PAN/VAT: {profile.pan_vat_number || "N/A"} • Phone: {profile.phone || "N/A"}</p>
+                                    <p className="font-bold text-xs mt-2 tracking-[0.2em] uppercase">Tax Invoice</p>
+                                </div>
 
-                            {/* Line Items */}
-                            {lastInvoice.items.map((item: CartItem, i: number) => (
-                                <div key={i} className="flex justify-between py-1 text-xs">
+                                {/* Meta */}
+                                <div className="flex justify-between text-xs text-gray-600 border-b border-gray-200 pb-3">
                                     <div>
-                                        <span className="font-medium">{item.name}</span>
-                                        <br /><span className="text-gray-400">{item.weightGrams.toFixed(2)}g {item.category}</span>
+                                        <p><strong>Invoice #:</strong> {lastInvoice.id}</p>
+                                        <p><strong>Cashier:</strong> {lastInvoice.cashier}</p>
                                     </div>
-                                    <span className="font-mono">रू {Number(item.total).toLocaleString()}</span>
+                                    <div className="text-right">
+                                        <p><strong>Date:</strong> {new Date(lastInvoice.date).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}</p>
+                                        <p><strong>Time:</strong> {new Date(lastInvoice.date).toLocaleTimeString("en-NP", { hour: "2-digit", minute: "2-digit" })}</p>
+                                    </div>
                                 </div>
-                            ))}
 
-                            <div className="border-t border-dashed border-gray-300 my-2" />
-                            <div className="flex justify-between font-bold text-sm">
-                                <span>Grand Total</span>
-                                <span className="font-mono">रू {Number(lastInvoice.grandTotal).toLocaleString()}</span>
-                            </div>
-                            <div className="border-t border-dashed border-gray-300 my-2" />
+                                {/* Items Table */}
+                                <table className="w-full text-xs border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-100">
+                                            <th className="text-left p-2 font-semibold">#</th>
+                                            <th className="text-left p-2 font-semibold">Item</th>
+                                            <th className="text-left p-2 font-semibold">Type</th>
+                                            <th className="text-left p-2 font-semibold">Weight</th>
+                                            <th className="text-right p-2 font-semibold">Rate/T</th>
+                                            <th className="text-right p-2 font-semibold">Jarti</th>
+                                            <th className="text-right p-2 font-semibold">Jyala</th>
+                                            <th className="text-right p-2 font-semibold">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {lastInvoice.items.map((item, i) => {
+                                            const tml = toTolaMashaLal(item.weightGrams);
+                                            const pricing = calculateFinalPrice({
+                                                ratePerTola: item.ratePerTola,
+                                                weightGrams: item.weightGrams,
+                                                wastageAmount: item.wastage,
+                                                makingCharge: item.making,
+                                            });
+                                            return (
+                                                <tr key={i} className="border-b border-gray-100">
+                                                    <td className="p-2 text-gray-500">{i + 1}</td>
+                                                    <td className="p-2 font-medium">{item.name}</td>
+                                                    <td className="p-2">{item.category}</td>
+                                                    <td className="p-2 font-mono">{formatTML(tml)} <span className="text-gray-400">({item.weightGrams.toFixed(2)}g)</span></td>
+                                                    <td className="p-2 text-right font-mono">रू{item.ratePerTola.toLocaleString()}</td>
+                                                    <td className="p-2 text-right font-mono">रू{item.wastage.toLocaleString()}</td>
+                                                    <td className="p-2 text-right font-mono">रू{item.making.toLocaleString()}</td>
+                                                    <td className="p-2 text-right font-mono font-semibold">रू{pricing.subtotal.toFixed(2)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
 
-                            {/* Dummy QR Code for IRD */}
-                            <div className="text-center mt-3">
-                                <div className="w-20 h-20 mx-auto border border-gray-300 rounded flex items-center justify-center bg-gray-50">
-                                    <QrCode className="w-12 h-12 text-gray-400" />
+                                {/* Totals */}
+                                <div className="border-t-2 border-black pt-3 space-y-1">
+                                    <div className="flex justify-between text-sm">
+                                        <span>Subtotal</span>
+                                        <span className="font-mono">रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span>VAT (13%)</span>
+                                        <span className="font-mono">रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between text-base font-extrabold border-t border-black pt-2 mt-2">
+                                        <span>GRAND TOTAL</span>
+                                        <span className="font-mono text-lg">रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
                                 </div>
-                                <p className="text-[10px] text-gray-400 mt-1">IRD Verification QR</p>
-                            </div>
 
-                            <p className="text-center text-[10px] text-gray-400 mt-3">Thank you for your business!</p>
-                            <p className="text-center text-[10px] text-gray-400">Powered by Walsong JwelFlow ERP</p>
+                                {/* QR + Footer */}
+                                <div className="text-center pt-4 border-t border-dashed border-gray-300 mt-4">
+                                    <div className="w-16 h-16 mx-auto border border-gray-300 rounded flex items-center justify-center bg-gray-50">
+                                        <QrCode className="w-10 h-10 text-gray-400" />
+                                    </div>
+                                    <p className="text-[9px] text-gray-400 mt-1">IRD Verification QR</p>
+                                    <p className="text-[10px] text-gray-500 mt-3">{profile.invoice_footer || "Thank you for your business!"}</p>
+                                    <p className="text-[9px] text-gray-400">Powered by Walsong JwelFlow ERP</p>
+                                </div>
+                            </div>
                         </div>
                     )}
-                    <DialogFooter className="p-4 pt-0">
-                        <Button onClick={() => window.print()} className="w-full bg-black text-white hover:bg-gray-800">
-                            <Printer className="w-4 h-4 mr-2" /> Print Receipt
+                    <DialogFooter className="p-4 pt-0 flex gap-2">
+                        <Button onClick={() => setShowInvoice(false)} variant="outline" className="flex-1 text-gray-700 border-gray-300">
+                            Close
+                        </Button>
+                        <Button onClick={handlePrintInvoice} className="flex-1 bg-black text-white hover:bg-gray-800">
+                            <Printer className="w-4 h-4 mr-2" /> Print / Save PDF
                         </Button>
                     </DialogFooter>
                 </DialogContent>
