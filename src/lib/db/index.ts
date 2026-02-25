@@ -1,7 +1,7 @@
 import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
-import { inventorySchema, dhitoSchema, ratesSchema, auditLogSchema } from './schemas';
+import { inventorySchema, dhitoSchema, ratesSchema, auditLogSchema, shopProfileSchema } from './schemas';
 
 // Only add plugins once
 let pluginsAdded = false;
@@ -25,7 +25,8 @@ const createDB = async () => {
         inventory: { schema: inventorySchema },
         dhito: { schema: dhitoSchema },
         rates: { schema: ratesSchema },
-        audit_log: { schema: auditLogSchema }
+        audit_log: { schema: auditLogSchema },
+        shop_profile: { schema: shopProfileSchema }
     });
 
     return db;

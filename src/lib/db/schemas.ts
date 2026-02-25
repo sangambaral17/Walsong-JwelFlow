@@ -69,3 +69,21 @@ export const auditLogSchema: RxJsonSchema<any> = {
     },
     required: ['id', 'timestamp', 'action', 'details']
 };
+
+export const shopProfileSchema: RxJsonSchema<any> = {
+    title: 'shop profile schema',
+    version: 0,
+    description: 'shop configuration for invoices and branding',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        shop_name: { type: 'string' },
+        logo_url: { type: 'string' },
+        pan_vat_number: { type: 'string' },
+        address: { type: 'string' },
+        phone: { type: 'string' },
+        invoice_footer: { type: 'string' }
+    },
+    required: ['id', 'shop_name', 'pan_vat_number']
+};
