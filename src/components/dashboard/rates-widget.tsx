@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/db";
-import { syncMarketRates } from "@/lib/rates-sync";
+import { syncMarketRates, MARKET_CONSTANTS } from "@/lib/rates-sync";
 import { useShop } from "@/lib/shop-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Coins, TrendingUp, Calendar } from "lucide-react";
@@ -12,21 +12,21 @@ export function RatesWidget() {
 
     useEffect(() => {
         const loadRates = async () => {
-            // Trigger sync service
+            // Trigger sync service (upserts today's rate if not present)
             await syncMarketRates();
 
             const db = await getDb();
             const today = new Date().toISOString().split('T')[0];
             setUpdateDate(new Date().toLocaleDateString('ne-NP', { year: 'numeric', month: 'long', day: 'numeric' }));
 
-            let currentRateSnapshot = await db.rates.findOne(today).exec();
-            if (currentRateSnapshot) {
-                // Apply Owner Premium
-                setRates({
-                    gold: currentRateSnapshot.gold_tola_rate + (profile.premium_gold || 0),
-                    silver: currentRateSnapshot.silver_tola_rate + (profile.premium_silver || 0)
-                });
-            }
+            const currentRateSnapshot = await db.rates.findOne(today).exec();
+            const baseGold = currentRateSnapshot?.gold_tola_rate ?? MARKET_CONSTANTS.HALLMARK_GOLD;
+            const baseSilver = currentRateSnapshot?.silver_tola_rate ?? MARKET_CONSTANTS.SILVER;
+
+            setRates({
+                gold: baseGold + (profile.premium_gold || 0),
+                silver: baseSilver + (profile.premium_silver || 0)
+            });
         };
 
         loadRates();
