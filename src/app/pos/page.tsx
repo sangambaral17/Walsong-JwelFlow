@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getDb } from "@/lib/db";
+import { safeUUID } from "@/lib/utils/safe-uuid";
 import { toGrams, calculateFinalPrice, formatTML, toTolaMashaLal } from "@/lib/jewelry-math";
 import { useShop } from "@/lib/shop-context";
 import { useAuth } from "@/lib/auth-context";
@@ -192,7 +193,7 @@ export default function POSPage() {
         });
 
         const item: CartItem = {
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             name: form.name || `${form.category} Item`,
             category: form.category,
             weightGrams: weightGrams.toNumber(),
@@ -240,7 +241,7 @@ export default function POSPage() {
 
             // Write immutable audit log entry for each sale item
             await db.audit_log.insert({
-                id: crypto.randomUUID(),
+                id: safeUUID(),
                 timestamp: new Date().toISOString(),
                 action: "SALE",
                 details: JSON.stringify({
@@ -303,7 +304,7 @@ export default function POSPage() {
             const exists = await db.customers.find({ selector: { name: customer.name } }).exec();
             if (exists.length === 0) {
                 await db.customers.insert({
-                    id: crypto.randomUUID(),
+                    id: safeUUID(),
                     name: customer.name,
                     phone: customer.phone,
                     address: customer.address,

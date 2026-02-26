@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getDb } from "@/lib/db";
+import { safeUUID } from "@/lib/utils/safe-uuid";
 import { toGrams, formatTML, toTolaMashaLal } from "@/lib/jewelry-math";
 import { useShop } from "@/lib/shop-context";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,7 @@ export default function DhitoPage() {
         const db = await getDb();
         const weightGrams = toGrams({ tola: Number(form.tola) || 0, masha: Number(form.masha) || 0, lal: Number(form.lal) || 0 });
         await db.dhito.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             customer_name: form.customer,
             item_description: form.description,
             weight_grams: weightGrams.toNumber(),
@@ -58,7 +59,7 @@ export default function DhitoPage() {
             date_pawned: new Date().toISOString(),
             status: "active",
         });
-        await db.audit_log.insert({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), action: "DHITO_NEW", details: `Loan to ${form.customer} — रू${form.loan}`, user: "staff" });
+        await db.audit_log.insert({ id: safeUUID(), timestamp: new Date().toISOString(), action: "DHITO_NEW", details: `Loan to ${form.customer} — रू${form.loan}`, user: "staff" });
         setForm({ customer: "", description: "", tola: "", masha: "", lal: "", loan: "", interest: "24" });
         setDialogOpen(false);
     };
@@ -68,7 +69,7 @@ export default function DhitoPage() {
         const doc = await db.dhito.findOne(id).exec();
         if (doc) {
             await doc.patch({ status: "redeemed" });
-            await db.audit_log.insert({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), action: "DHITO_REDEEM", details: `Redeemed for ${doc.customer_name}`, user: "staff" });
+            await db.audit_log.insert({ id: safeUUID(), timestamp: new Date().toISOString(), action: "DHITO_REDEEM", details: `Redeemed for ${doc.customer_name}`, user: "staff" });
         }
     };
 

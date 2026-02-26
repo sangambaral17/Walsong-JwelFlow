@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getDb } from "@/lib/db";
+import { safeUUID } from "@/lib/utils/safe-uuid";
 import { Staff } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,7 +72,7 @@ export function StaffManager() {
 
         const db = await getDb();
         await db.staff.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             name: form.name.trim(),
             pin: form.pin,
             role: form.role,
@@ -79,7 +80,7 @@ export function StaffManager() {
         });
 
         await db.audit_log.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             timestamp: new Date().toISOString(),
             action: "STAFF_CREATED",
             details: `Created new ${form.role}: ${form.name}`,
@@ -105,7 +106,7 @@ export function StaffManager() {
         if (doc) {
             await doc.remove();
             await db.audit_log.insert({
-                id: crypto.randomUUID(),
+                id: safeUUID(),
                 timestamp: new Date().toISOString(),
                 action: "STAFF_DELETED",
                 details: `Deleted user: ${name}`,
@@ -127,7 +128,7 @@ export function StaffManager() {
         if (doc) {
             await doc.patch({ active: !currentActive });
             await db.audit_log.insert({
-                id: crypto.randomUUID(),
+                id: safeUUID(),
                 timestamp: new Date().toISOString(),
                 action: currentActive ? "STAFF_DEACTIVATED" : "STAFF_ACTIVATED",
                 details: `${currentActive ? "Deactivated" : "Activated"} user: ${name}`,
@@ -183,7 +184,7 @@ export function StaffManager() {
 
             await doc.patch(patchData);
             await db.audit_log.insert({
-                id: crypto.randomUUID(),
+                id: safeUUID(),
                 timestamp: new Date().toISOString(),
                 action: "STAFF_PIN_UPDATE",
                 details: `Updated ${editPin ? "PIN and name" : "name"} for user: ${editName}`,

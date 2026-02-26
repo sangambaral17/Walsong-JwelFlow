@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getDb } from "@/lib/db";
+import { safeUUID } from "@/lib/utils/safe-uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,7 +42,7 @@ export default function CustomersPage() {
     const handleAdd = async () => {
         const db = await getDb();
         await db.customers.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             name: form.name,
             phone: form.phone,
             address: form.address,

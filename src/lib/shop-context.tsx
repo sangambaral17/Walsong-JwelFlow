@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getDb } from "@/lib/db";
+import { safeUUID } from "@/lib/utils/safe-uuid";
 
 export interface ShopProfile {
     id: string;
@@ -94,7 +95,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
 
         // Audit log
         await db.audit_log.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             timestamp: new Date().toISOString(),
             action: "SHOP_PROFILE_UPDATE",
             details: JSON.stringify(data),
