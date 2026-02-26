@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
+import { GlobalErrorBoundary } from "@/components/debug/error-boundary";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${playfair.variable} ${inter.variable} font-sans antialiased`}>
-        <AppShell>{children}</AppShell>
+        <GlobalErrorBoundary>
+          <AppShell>{children}</AppShell>
+        </GlobalErrorBoundary>
       </body>
     </html>
   );

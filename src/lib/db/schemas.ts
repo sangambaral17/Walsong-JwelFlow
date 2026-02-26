@@ -126,7 +126,7 @@ export const staffSchema: RxJsonSchema<any> = {
 
 export const invoicesSchema: RxJsonSchema<any> = {
     title: 'invoices schema',
-    version: 0,
+    version: 1,
     description: 'completed sale invoices with full detail',
     primaryKey: 'id',
     type: 'object',
@@ -140,6 +140,8 @@ export const invoicesSchema: RxJsonSchema<any> = {
         subtotal: { type: 'number' },
         vat_amount: { type: 'number' },
         grand_total: { type: 'number' },
+        paid_amount: { type: 'number' },
+        balance_due: { type: 'number' },
         cashier: { type: 'string' },
         payment_method: { type: 'string' }, // 'cash', 'bank', 'credit'
         notes: { type: 'string' }

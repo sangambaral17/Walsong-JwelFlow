@@ -171,20 +171,55 @@
   box-shadow: 0 0 40px rgba(212, 175, 55, 0.05);
 }
 
-/* Print styles for 80mm thermal receipt */
+/* =====================================================
+   PRINT STYLES — Forces perfect white invoice printout
+   Overcomes dark theme, removes all bleed-through
+   ===================================================== */
 @media print {
   @page {
-    size: 80mm auto;
-    margin: 2mm;
+    size: auto;
+    margin: 8mm;
   }
 
-  body {
+  /* Hard reset: force white background + black text on everything */
+  html,
+  body,
+  body * {
     background: white !important;
-    color: black !important;
-    font-size: 12px;
+    background-color: white !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
   }
 
-  .no-print {
+  /* Hide all app UI — only the printable invoice should show */
+  .no-print,
+  header,
+  nav,
+  aside,
+  footer,
+  [role="dialog"],
+  [data-radix-popper-content-wrapper] {
     display: none !important;
+  }
+
+  /* Make printable invoice visible */
+  #printable-invoice {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Table cell borders remain visible as defined inline */
+  table,
+  th,
+  td {
+    border-color: #000 !important;
+  }
+
+  /* Ensure borders in print remain visible */
+  .print-border {
+    border: 1px solid #000 !important;
   }
 }

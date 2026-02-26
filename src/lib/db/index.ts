@@ -1,6 +1,7 @@
 import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
+import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import { inventorySchema, dhitoSchema, ratesSchema, auditLogSchema, shopProfileSchema, customerSchema, staffSchema, invoicesSchema } from './schemas';
 
 // Only add plugins once
@@ -9,28 +10,54 @@ let pluginsAdded = false;
 const initPlugins = () => {
     if (pluginsAdded) return;
     addRxPlugin(RxDBQueryBuilderPlugin);
+    addRxPlugin(RxDBMigrationSchemaPlugin);
     pluginsAdded = true;
 };
 
 let dbPromise: any = null;
 
+const collectionDefs = {
+    inventory: { schema: inventorySchema },
+    dhito: { schema: dhitoSchema },
+    rates: { schema: ratesSchema },
+    audit_log: { schema: auditLogSchema },
+    shop_profile: { schema: shopProfileSchema },
+    customers: { schema: customerSchema },
+    staff: { schema: staffSchema },
+    invoices: {
+        schema: invoicesSchema,
+        // Migration: v0 → v1 backfills paid_amount and balance_due
+        // Old invoices are considered fully paid (balance = 0)
+        migrationStrategies: {
+            1: (oldDoc: any) => {
+                oldDoc.paid_amount = oldDoc.grand_total ?? 0;
+                oldDoc.balance_due = 0;
+                return oldDoc;
+            }
+        }
+    }
+};
+
 const createDB = async () => {
     initPlugins();
-    const db = await createRxDatabase({
+    let db = await createRxDatabase({
         name: 'walsongdb',
         storage: getRxStorageDexie()
     });
 
-    await db.addCollections({
-        inventory: { schema: inventorySchema },
-        dhito: { schema: dhitoSchema },
-        rates: { schema: ratesSchema },
-        audit_log: { schema: auditLogSchema },
-        shop_profile: { schema: shopProfileSchema },
-        customers: { schema: customerSchema },
-        staff: { schema: staffSchema },
-        invoices: { schema: invoicesSchema }
-    });
+    try {
+        await db.addCollections(collectionDefs);
+    } catch (err) {
+        console.warn('[DB] addCollections failed, attempting database recovery...', err);
+        // Remove stale DB and recreate — handles schema version conflicts
+        await db.remove();
+        db = await createRxDatabase({
+            name: 'walsongdb',
+            storage: getRxStorageDexie()
+        });
+        await db.addCollections(collectionDefs);
+        console.log('[DB] Database recovered successfully.');
+    }
 
     return db;
 };

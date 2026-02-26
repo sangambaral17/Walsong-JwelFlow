@@ -8,7 +8,7 @@ import { EodModal } from "@/components/reports/eod-modal";
 import { useShop } from "@/lib/shop-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2 } from "lucide-react";
+import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/db";
@@ -24,22 +24,35 @@ export default function Home() {
     silverWeight: { t: 0, m: 0, l: 0 },
     revenueDay: 0,
     dhitoLiability: 0,
-    itemCount: 0
+    itemCount: 0,
+    // New dashboard metrics
+    txCountToday: 0,
+    cashTotal: 0,
+    digitalTotal: 0,
+    creditTotal: 0,
+    lowStockItems: [] as { name: string; category: string; grams: number }[],
   });
 
   useEffect(() => {
     const fetchStats = async () => {
       const db = await getDb();
 
-      // 1. Gold Stock (Sum of net_weight where weight_tola > 0 or categories like Gold)
+      // 1. Gold Stock
       const inventory = await db.inventory.find().exec();
       let totalGoldGrams = 0;
       let totalSilverGrams = 0;
+      const lowStockItems: { name: string; category: string; grams: number }[] = [];
+
       inventory.forEach((item: any) => {
+        const grams = item.net_weight_grams || 0;
         if (item.category?.toLowerCase().includes('gold')) {
-          totalGoldGrams += item.net_weight_grams || 0;
+          totalGoldGrams += grams;
         } else if (item.category?.toLowerCase().includes('silver')) {
-          totalSilverGrams += item.net_weight_grams || 0;
+          totalSilverGrams += grams;
+        }
+        // Low stock = items with weight below 2 grams
+        if (grams > 0 && grams < 2) {
+          lowStockItems.push({ name: item.name, category: item.category, grams });
         }
       });
 
@@ -52,20 +65,27 @@ export default function Home() {
         return { t, m, l };
       };
 
-      // 2. Revenue (Sum from Audit Log for today)
+      // 2. Today's invoices (real data, not audit log)
+      const allInvoices = await db.invoices.find().exec();
       const today = new Date().toISOString().split('T')[0];
-      const logs = await db.audit_log.find({
-        selector: {
-          timestamp: { $gte: today },
-          action: 'SALE'
-        }
-      }).exec();
       let revenue = 0;
-      logs.forEach((log: any) => {
-        try {
-          const details = JSON.parse(log.details);
-          revenue += details.total_amount || 0;
-        } catch (e) { }
+      let txCount = 0;
+      let cashTotal = 0;
+      let digitalTotal = 0;
+      let creditTotal = 0;
+
+      allInvoices.forEach((doc: any) => {
+        const inv = doc.toJSON();
+        if (inv.date && inv.date.startsWith(today)) {
+          revenue += inv.grand_total || 0;
+          txCount += 1;
+
+          const method = (inv.payment_method || "cash").toLowerCase();
+          if (method === "cash") cashTotal += inv.grand_total || 0;
+          else if (method === "bank") digitalTotal += inv.grand_total || 0;
+          else if (method === "credit") creditTotal += inv.grand_total || 0;
+          else cashTotal += inv.grand_total || 0;
+        }
       });
 
       // 3. Dhito Liability
@@ -80,7 +100,12 @@ export default function Home() {
         silverWeight: toTML(totalSilverGrams),
         revenueDay: revenue,
         dhitoLiability: liability,
-        itemCount: inventory.length
+        itemCount: inventory.length,
+        txCountToday: txCount,
+        cashTotal,
+        digitalTotal,
+        creditTotal,
+        lowStockItems: lowStockItems.slice(0, 5),
       });
     };
 
@@ -89,14 +114,20 @@ export default function Home() {
     // Subscribe to changes
     const dbPromise = getDb();
     let sub: any;
+    let sub2: any;
     dbPromise.then((db: any) => {
       sub = db.inventory.find().$.subscribe(() => fetchStats());
+      sub2 = db.invoices.find().$.subscribe(() => fetchStats());
     });
 
-    return () => sub?.unsubscribe();
+    return () => { sub?.unsubscribe(); sub2?.unsubscribe(); };
   }, []);
 
   const isOwner = user?.role === "owner";
+  const totalDayPayments = stats.cashTotal + stats.digitalTotal + stats.creditTotal;
+  const cashPercent = totalDayPayments > 0 ? Math.round((stats.cashTotal / totalDayPayments) * 100) : 0;
+  const digitalPercent = totalDayPayments > 0 ? Math.round((stats.digitalTotal / totalDayPayments) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
       {/* Subtle radial glow behind header */}
@@ -162,6 +193,83 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ===== TODAY AT A GLANCE (New Section) ===== */}
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="glass-card border-primary/20">
+            <CardContent className="p-5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">आजको बिक्री (Today&apos;s Sales)</p>
+              <p className="text-3xl font-bold font-mono text-primary tracking-tight">
+                रू {stats.revenueDay.toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardContent className="p-5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Transactions Today</p>
+              <p className="text-3xl font-bold font-mono text-foreground tracking-tight">
+                {stats.txCountToday}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">invoices generated</p>
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardContent className="p-5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Cash vs Digital</p>
+              {totalDayPayments > 0 ? (
+                <>
+                  <div className="flex h-3 rounded-full overflow-hidden bg-background/50 border border-border/30">
+                    <div className="bg-green-500 transition-all" style={{ width: `${cashPercent}%` }} />
+                    <div className="bg-blue-500 transition-all" style={{ width: `${digitalPercent}%` }} />
+                    <div className="bg-orange-500 flex-1" />
+                  </div>
+                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                    <span>💵 {cashPercent}%</span>
+                    <span>🏦 {digitalPercent}%</span>
+                    <span>📝 {100 - cashPercent - digitalPercent}%</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No payments today</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardContent className="p-5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Inventory Items</p>
+              <p className="text-3xl font-bold font-mono text-foreground tracking-tight">
+                {stats.itemCount}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">total items in stock</p>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Low Stock Alerts */}
+        {stats.lowStockItems.length > 0 && (
+          <section>
+            <Card className="glass-card border-orange-500/20 bg-orange-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-orange-500 flex items-center gap-2 text-base">
+                  <AlertTriangle className="w-5 h-5" /> Low Stock Alert
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {stats.lowStockItems.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/30">
+                      <div>
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.category}</p>
+                      </div>
+                      <span className="text-xs font-mono text-orange-500 font-semibold">{item.grams.toFixed(2)}g</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
         {/* Zero State / Welcome Banner */}
         {stats.itemCount === 0 && (
           <div className="glass-card border-primary/20 bg-gradient-to-r from-primary/10 via-background to-transparent p-8 rounded-2xl flex items-center justify-between overflow-hidden relative group">
@@ -199,7 +307,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Daily Rates + Quick Actions */}
+        {/* Quick Actions + Daily Rates */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3">
             <RatesWidget />
@@ -224,6 +332,28 @@ export default function Home() {
                     <Package className="w-6 h-6 text-foreground" />
                   </div>
                   <span className="font-medium text-lg tracking-tight">Inventory</span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/reports" className="block group h-full">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
+                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
+                  <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                    <BarChart3 className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <span className="font-medium text-lg tracking-tight">Reports</span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/settings" className="block group h-full">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
+                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
+                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                    <Settings className="w-6 h-6 text-foreground" />
+                  </div>
+                  <span className="font-medium text-lg tracking-tight">Settings</span>
                   <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </CardContent>
               </Card>

@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Scale, ShoppingCart, Printer, Plus, Trash2, QrCode, CheckCircle2, Usb, User, Search, X } from "lucide-react";
+import { ArrowLeft, Scale, ShoppingCart, Printer, Plus, Trash2, QrCode, CheckCircle2, Usb, User, Search, X, Package } from "lucide-react";
 import Link from "next/link";
 
 interface CartItem {
@@ -42,6 +42,8 @@ interface InvoiceData {
     subtotal: string;
     vatAmount: string;
     grandTotal: string;
+    paidAmount: string;
+    balanceDue: string;
     cashier: string;
     paymentMethod: string;
 }
@@ -63,6 +65,13 @@ export default function POSPage() {
     const [customerResults, setCustomerResults] = useState<any[]>([]);
     const [showCustomerPanel, setShowCustomerPanel] = useState(true);
     const [paymentMethod, setPaymentMethod] = useState("cash");
+    const [isPartialPayment, setIsPartialPayment] = useState(false);
+    const [paidAmountInput, setPaidAmountInput] = useState("");
+
+    // Inventory search state
+    const [inventorySearch, setInventorySearch] = useState("");
+    const [inventoryResults, setInventoryResults] = useState<any[]>([]);
+    const [showInventorySearch, setShowInventorySearch] = useState(true);
 
     // Form for adding items
     const [form, setForm] = useState({
@@ -98,6 +107,43 @@ export default function POSPage() {
         };
         search();
     }, [customerSearch]);
+
+    // Search inventory items for POS
+    useEffect(() => {
+        if (!inventorySearch.trim()) {
+            setInventoryResults([]);
+            return;
+        }
+        const searchInventory = async () => {
+            const db = await getDb();
+            const all = await db.inventory.find().exec();
+            const q = inventorySearch.toLowerCase();
+            const filtered = all
+                .map((d: any) => d.toJSON())
+                .filter((item: any) =>
+                    item.name?.toLowerCase().includes(q) ||
+                    item.category?.toLowerCase().includes(q)
+                );
+            setInventoryResults(filtered.slice(0, 8));
+        };
+        searchInventory();
+    }, [inventorySearch]);
+
+    const selectInventoryItem = (item: any) => {
+        setForm({
+            name: item.name || "",
+            category: item.category || "Gold",
+            tola: String(item.weight_tola || 0),
+            masha: String(item.weight_masha || 0),
+            lal: String(item.weight_lal || 0),
+            wastage: String(item.jarti || 0),
+            making: String(item.jyala || 0),
+        });
+        setInventorySearch("");
+        setInventoryResults([]);
+        setShowInventorySearch(false);
+        console.log(`[POS] Selected inventory item: ${item.name} (${item.net_weight_grams}g)`);
+    };
 
     const selectCustomer = (c: any) => {
         setCustomer({ name: c.name, phone: c.phone || "", address: c.address || "" });
@@ -213,6 +259,13 @@ export default function POSPage() {
             });
         }
 
+        // Partial payment logic
+        const paidAmt = isPartialPayment
+            ? new Decimal(paidAmountInput || "0")
+            : grandTotal;
+        const balAmt = grandTotal.minus(paidAmt);
+        const effectivePaymentMethod = isPartialPayment && balAmt.gt(0) ? "credit" : paymentMethod;
+
         const invoiceData: InvoiceData = {
             id: invoiceId,
             date: new Date().toISOString(),
@@ -221,8 +274,10 @@ export default function POSPage() {
             subtotal: totalSubtotal.toFixed(2),
             vatAmount: totalVat.toFixed(2),
             grandTotal: grandTotal.toFixed(2),
+            paidAmount: paidAmt.toFixed(2),
+            balanceDue: balAmt.lt(0) ? "0.00" : balAmt.toFixed(2),
             cashier: user?.name || "Staff",
-            paymentMethod,
+            paymentMethod: effectivePaymentMethod,
         };
 
         // Save invoice to DB for history
@@ -236,8 +291,10 @@ export default function POSPage() {
             subtotal: totalSubtotal.toNumber(),
             vat_amount: totalVat.toNumber(),
             grand_total: grandTotal.toNumber(),
+            paid_amount: paidAmt.toNumber(),
+            balance_due: balAmt.lt(0) ? 0 : balAmt.toNumber(),
             cashier: invoiceData.cashier,
-            payment_method: paymentMethod,
+            payment_method: effectivePaymentMethod,
             notes: "",
         });
 
@@ -259,10 +316,118 @@ export default function POSPage() {
         setLastInvoice(invoiceData);
         setShowInvoice(true);
         setCart([]);
+        setIsPartialPayment(false);
+        setPaidAmountInput("");
     };
 
     const handlePrintInvoice = () => {
-        window.print();
+        if (!lastInvoice) return;
+
+        const shopName = profile.shop_name || "Walsong Jewellers";
+        const shopAddr = profile.address || "Kathmandu, Nepal";
+        const shopPan = profile.pan_vat_number || "N/A";
+        const shopPhone = profile.phone || "N/A";
+        const footer = profile.invoice_footer || "Thank you for your business!";
+        const dateObj = new Date(lastInvoice.date);
+        const dateStr = dateObj.toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" });
+        const timeStr = dateObj.toLocaleTimeString("en-NP", { hour: "2-digit", minute: "2-digit" });
+
+        // Build item rows
+        const itemRows = lastInvoice.items.map((item, i) => {
+            const tml = toTolaMashaLal(item.weightGrams);
+            const pricing = calculateFinalPrice({ ratePerTola: item.ratePerTola, weightGrams: item.weightGrams, wastageAmount: item.wastage, makingCharge: item.making });
+            return `<tr>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;">${i + 1}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;font-weight:600;">${item.name}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;">${item.category}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;font-family:monospace;">${formatTML(tml)} (${item.weightGrams.toFixed(2)}g)</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-family:monospace;">रू${item.ratePerTola.toLocaleString()}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-family:monospace;">रू${item.wastage.toLocaleString()}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-family:monospace;">रू${item.making.toLocaleString()}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-family:monospace;font-weight:700;">रू${pricing.subtotal.toFixed(2)}</td>
+            </tr>`;
+        }).join("");
+
+        const balanceDueSection = Number(lastInvoice.balanceDue) > 0 ? `
+            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-top:1px dashed #aaa;margin-top:4px;">
+                <span>Paid Today (${lastInvoice.paymentMethod.toUpperCase()})</span>
+                <span style="font-family:monospace;color:#16a34a;">रू ${Number(lastInvoice.paidAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;font-weight:700;color:#dc2626;">
+                <span>⚠ BALANCE DUE (Credit)</span>
+                <span style="font-family:monospace;">रू ${Number(lastInvoice.balanceDue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            <p style="font-size:9px;color:#666;font-style:italic;margin-top:2px;">* Outstanding balance. Interest may apply after 30 days.</p>
+        ` : "";
+
+        const printHtml = `<!DOCTYPE html><html><head>
+            <title>Invoice ${lastInvoice.id}</title>
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000; background: #fff; max-width: 210mm; padding: 12mm; margin: 0 auto; }
+                table { width: 100%; border-collapse: collapse; }
+                @media print { @page { size: A5; margin: 12mm; } }
+            </style>
+        </head><body>
+            <!-- Header -->
+            <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:8px;">
+                <h1 style="font-size:20px;font-weight:800;margin:0;letter-spacing:1px;">✦ ${shopName} ✦</h1>
+                <p style="margin:2px 0;font-size:10px;color:#444;">${shopAddr}</p>
+                <p style="margin:2px 0;font-size:10px;color:#444;">PAN/VAT: ${shopPan} &nbsp;•&nbsp; Phone: ${shopPhone}</p>
+                <p style="font-weight:700;margin-top:6px;font-size:13px;letter-spacing:2px;">TAX INVOICE</p>
+            </div>
+
+            <!-- Meta -->
+            <div style="display:flex;justify-content:space-between;font-size:10px;padding:6px 0;border-bottom:1px solid #ccc;margin-bottom:8px;">
+                <div><strong>Invoice #:</strong> ${lastInvoice.id}<br/><strong>Cashier:</strong> ${lastInvoice.cashier}<br/><strong>Payment:</strong> ${lastInvoice.paymentMethod.toUpperCase()}</div>
+                <div style="text-align:right;"><strong>Date:</strong> ${dateStr}<br/><strong>Time:</strong> ${timeStr}</div>
+            </div>
+
+            <!-- Customer -->
+            <div style="border:1px solid #ccc;padding:6px 10px;margin-bottom:10px;font-size:10px;">
+                <strong>Bill To:</strong><br/>
+                <span style="font-size:12px;font-weight:700;">${lastInvoice.customer.name}</span><br/>
+                ${lastInvoice.customer.phone ? `Phone: ${lastInvoice.customer.phone}<br/>` : ""}
+                ${lastInvoice.customer.address ? `Address: ${lastInvoice.customer.address}` : ""}
+            </div>
+
+            <!-- Items Table -->
+            <table style="margin-bottom:8px;">
+                <thead><tr style="background:#f3f3f3;">
+                    <th style="text-align:left;padding:6px;font-size:9px;border-bottom:2px solid #000;">#</th>
+                    <th style="text-align:left;padding:6px;font-size:9px;border-bottom:2px solid #000;">Item</th>
+                    <th style="text-align:left;padding:6px;font-size:9px;border-bottom:2px solid #000;">Type</th>
+                    <th style="text-align:left;padding:6px;font-size:9px;border-bottom:2px solid #000;">Weight</th>
+                    <th style="text-align:right;padding:6px;font-size:9px;border-bottom:2px solid #000;">Rate/T</th>
+                    <th style="text-align:right;padding:6px;font-size:9px;border-bottom:2px solid #000;">Jarti</th>
+                    <th style="text-align:right;padding:6px;font-size:9px;border-bottom:2px solid #000;">Jyala</th>
+                    <th style="text-align:right;padding:6px;font-size:9px;border-bottom:2px solid #000;">Amount</th>
+                </tr></thead>
+                <tbody>${itemRows}</tbody>
+            </table>
+
+            <!-- Totals -->
+            <div style="border-top:2px solid #000;padding-top:8px;margin-top:8px;">
+                <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;"><span>Subtotal (before VAT)</span><span style="font-family:monospace;">रू ${Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;"><span>VAT (13%)</span><span style="font-family:monospace;">रू ${Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:6px 0 0;font-size:15px;font-weight:800;border-top:1px solid #000;margin-top:4px;"><span>GRAND TOTAL</span><span style="font-family:monospace;">रू ${Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                ${balanceDueSection}
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align:center;margin-top:16px;padding-top:8px;border-top:1px dashed #999;font-size:9px;color:#666;">
+                <p>${footer}</p>
+                <p style="margin-top:4px;">Powered by Walsong JwelFlow ERP • © ${new Date().getFullYear()}</p>
+            </div>
+        </body></html>`;
+
+        const printWindow = window.open("", "_blank", "width=600,height=800");
+        if (printWindow) {
+            printWindow.document.write(printHtml);
+            printWindow.document.close();
+            printWindow.onload = () => { printWindow.focus(); printWindow.print(); printWindow.close(); };
+            setTimeout(() => { try { printWindow.focus(); printWindow.print(); printWindow.close(); } catch { } }, 1500);
+        }
     };
 
     const currentWeightGrams = toGrams({
@@ -358,6 +523,13 @@ export default function POSPage() {
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 11 }}><span>Subtotal (before VAT)</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 11 }}><span>VAT (13%)</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0 0", fontSize: 15, fontWeight: 800, borderTop: "1px solid #000", marginTop: 4 }}><span>GRAND TOTAL</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        {Number(lastInvoice.balanceDue) > 0 && (
+                            <>
+                                <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 11, borderTop: "1px dashed #aaa", marginTop: 4 }}><span>Paid Today ({lastInvoice.paymentMethod.toUpperCase()})</span><span style={{ fontFamily: "monospace", color: "#16a34a" }}>रू {Number(lastInvoice.paidAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, fontWeight: 700, color: "#dc2626" }}><span>⚠ BALANCE DUE (Credit)</span><span style={{ fontFamily: "monospace" }}>रू {Number(lastInvoice.balanceDue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                <p style={{ fontSize: 9, color: "#666", fontStyle: "italic", marginTop: 2 }}>* Outstanding balance. Interest may apply after 30 days.</p>
+                            </>
+                        )}
                     </div>
 
                     <div style={{ textAlign: "center", marginTop: 16 }}>
@@ -476,6 +648,71 @@ export default function POSPage() {
                                     </button>
                                 ))}
                             </div>
+                        </div>
+
+                        {/* Inventory Item Search */}
+                        <div className="glass-card rounded-xl p-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                                    <Package className="w-5 h-5 text-primary" /> Search Inventory
+                                </h2>
+                                <button
+                                    onClick={() => setShowInventorySearch(!showInventorySearch)}
+                                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                                >
+                                    {showInventorySearch ? "Hide" : "Show"}
+                                </button>
+                            </div>
+                            {showInventorySearch && (
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search inventory by name or category..."
+                                        value={inventorySearch}
+                                        onChange={e => setInventorySearch(e.target.value)}
+                                        className="pl-10 bg-background/50"
+                                    />
+                                    {inventoryResults.length > 0 && (
+                                        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-xl max-h-64 overflow-auto">
+                                            {inventoryResults.map((item: any) => (
+                                                <button
+                                                    key={item.id}
+                                                    onClick={() => selectInventoryItem(item)}
+                                                    className="w-full text-left px-4 py-3 hover:bg-primary/10 border-b border-border/30 last:border-0 transition-colors"
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <p className="font-medium text-sm">{item.name}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {item.category} • {item.net_weight_grams?.toFixed(2)}g
+                                                                {item.weight_tola > 0 && ` • ${item.weight_tola}T ${item.weight_masha}M ${item.weight_lal}L`}
+                                                            </p>
+                                                        </div>
+                                                        <Badge variant="outline" className="border-primary/30 text-primary text-xs">{item.category}</Badge>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => { setInventorySearch(""); setInventoryResults([]); setShowInventorySearch(false); }}
+                                                className="w-full text-center px-4 py-3 text-primary text-sm font-medium hover:bg-primary/5 transition-colors"
+                                            >
+                                                <Plus className="w-3 h-3 inline mr-1" /> Add New Item Manually
+                                            </button>
+                                        </div>
+                                    )}
+                                    {inventorySearch.trim() && inventoryResults.length === 0 && (
+                                        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-xl p-4 text-center">
+                                            <p className="text-sm text-muted-foreground">No inventory items found for "{inventorySearch}"</p>
+                                            <button
+                                                onClick={() => { setInventorySearch(""); setShowInventorySearch(false); }}
+                                                className="mt-2 text-primary text-sm font-medium hover:underline"
+                                            >
+                                                <Plus className="w-3 h-3 inline mr-1" /> Enter item manually
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Item Entry Card */}
@@ -628,6 +865,59 @@ export default function POSPage() {
                                         <span className="text-lg font-semibold">Grand Total</span>
                                         <span className="text-2xl font-bold text-primary font-mono">रू {grandTotal.toFixed(2)}</span>
                                     </div>
+
+                                    {/* Payment Method */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {(["cash", "bank", "credit"] as const).map((m) => (
+                                            <button
+                                                key={m}
+                                                onClick={() => setPaymentMethod(m)}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all capitalize ${paymentMethod === m
+                                                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
+                                                    : "border-border/40 text-muted-foreground hover:border-primary/40"
+                                                    }`}
+                                            >
+                                                {m === "cash" ? "💵 Cash" : m === "bank" ? "🏦 Bank" : "📋 Credit"}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Partial Payment Toggle */}
+                                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={isPartialPayment}
+                                                onChange={(e) => {
+                                                    setIsPartialPayment(e.target.checked);
+                                                    if (!e.target.checked) setPaidAmountInput("");
+                                                }}
+                                                className="w-4 h-4 accent-amber-500"
+                                            />
+                                            <span className="text-sm font-medium text-amber-400">💳 Partial / Advance Payment (Credit)</span>
+                                        </label>
+                                        {isPartialPayment && (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-amber-300">Amount Paid Today (रू)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={paidAmountInput}
+                                                    onChange={(e) => setPaidAmountInput(e.target.value)}
+                                                    placeholder={`Max: ${grandTotal.toFixed(2)}`}
+                                                    className="bg-background/60 border-amber-500/30 focus-visible:ring-amber-500"
+                                                />
+                                                {paidAmountInput && (
+                                                    <div className="flex justify-between text-xs pt-1">
+                                                        <span className="text-muted-foreground">Balance Due:</span>
+                                                        <span className="font-mono font-bold text-red-400">
+                                                            रू {Math.max(0, grandTotal.toNumber() - Number(paidAmountInput)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <Button
                                         onClick={handleCheckout}
                                         disabled={!customer.name.trim()}
@@ -718,6 +1008,13 @@ export default function POSPage() {
                                     <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-mono">रू {Number(lastInvoice.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                                     <div className="flex justify-between text-sm"><span>VAT (13%)</span><span className="font-mono">रू {Number(lastInvoice.vatAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                                     <div className="flex justify-between text-base font-extrabold border-t border-black pt-2 mt-2"><span>GRAND TOTAL</span><span className="font-mono text-lg">रू {Number(lastInvoice.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                    {Number(lastInvoice.balanceDue) > 0 && (
+                                        <>
+                                            <div className="flex justify-between text-sm text-green-700 border-t border-dashed border-gray-300 pt-2"><span>Paid Today</span><span className="font-mono">रू {Number(lastInvoice.paidAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                            <div className="flex justify-between text-base font-extrabold text-red-600"><span>⚠ BALANCE DUE</span><span className="font-mono">रू {Number(lastInvoice.balanceDue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                                            <p className="text-[9px] text-gray-400 italic">* Balance is due. Interest may apply after 30 days.</p>
+                                        </>
+                                    )}
                                 </div>
 
                                 {/* QR + Footer */}
