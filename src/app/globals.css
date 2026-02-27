@@ -169,6 +169,62 @@
 .glass-card:hover {
   border-color: rgba(212, 175, 55, 0.35);
   box-shadow: 0 0 40px rgba(212, 175, 55, 0.05);
+  transform: translateY(-1px);
+}
+
+/* ─── Premium Micro-Interactions ─── */
+
+/* Button press feedback */
+button,
+a[href],
+[role="button"] {
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+}
+
+button:active:not(:disabled),
+a[href]:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* Nav link hover underline */
+nav a {
+  position: relative;
+}
+
+nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 1.5px;
+  background: var(--primary);
+  transition: width 0.25s ease, left 0.25s ease;
+}
+
+nav a:hover::after {
+  width: 100%;
+  left: 0;
+}
+
+/* Card lift & glow on hover */
+.glass-card {
+  transition: transform 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Smooth focus rings */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  transition: outline-offset 0.15s ease;
+}
+
+/* Input focus glow */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
 }
 
 /* =====================================================

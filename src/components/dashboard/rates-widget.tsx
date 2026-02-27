@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { getDb } from "@/lib/db";
-import { syncMarketRates, MARKET_CONSTANTS } from "@/lib/rates-sync";
+import { syncMarketRates, MARKET_CONSTANTS, getLastSyncInfo } from "@/lib/rates-sync";
 import { useShop } from "@/lib/shop-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Coins, TrendingUp, TrendingDown, Calendar, RefreshCw, Wifi, WifiOff, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Coins, TrendingUp, Calendar, RefreshCw, Wifi, WifiOff, ArrowUp, ArrowDown, Minus, AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface RateChange {
@@ -35,6 +35,8 @@ function ChangeChip({ change, label }: { change: RateChange | null; label: strin
     );
 }
 
+type WidgetState = "loading" | "ready" | "error";
+
 export function RatesWidget() {
     const { profile } = useShop();
     const [rates, setRates] = useState<{ gold: number; silver: number } | null>(null);
@@ -42,11 +44,33 @@ export function RatesWidget() {
     const [updateDate, setUpdateDate] = useState<string>("");
     const [isLive, setIsLive] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [widgetState, setWidgetState] = useState<WidgetState>("loading");
+    const [lastSynced, setLastSynced] = useState<string>("");
     const [goldChanges, setGoldChanges] = useState<{ day: RateChange | null; week: RateChange | null }>({ day: null, week: null });
     const [silverChanges, setSilverChanges] = useState<{ day: RateChange | null; week: RateChange | null }>({ day: null, week: null });
+    const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const loadRates = useCallback(async () => {
         setRefreshing(true);
+
+        // Safety timeout: if loading takes > 12 seconds, force show cached/fallback data
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = setTimeout(() => {
+            // If we're still refreshing after 12s, force finish with whatever we have
+            setRefreshing(false);
+            if (!rates) {
+                // Show fallback constants so we never get stuck
+                setRates({
+                    gold: MARKET_CONSTANTS.HALLMARK_GOLD + (profile.premium_gold || 0),
+                    silver: MARKET_CONSTANTS.SILVER + (profile.premium_silver || 0),
+                });
+                setWidgetState("ready");
+                setIsLive(false);
+                setUpdateDate(new Date().toLocaleDateString('ne-NP', { year: 'numeric', month: 'long', day: 'numeric' }));
+                setLastSynced("Fallback — could not reach server");
+            }
+        }, 12_000);
+
         try {
             const synced = await syncMarketRates();
 
@@ -59,12 +83,19 @@ export function RatesWidget() {
             const baseGold = currentRateSnapshot?.gold_tola_rate ?? MARKET_CONSTANTS.HALLMARK_GOLD;
             const baseSilver = currentRateSnapshot?.silver_tola_rate ?? MARKET_CONSTANTS.SILVER;
 
-            setIsLive(baseGold !== MARKET_CONSTANTS.HALLMARK_GOLD || synced);
+            setIsLive(synced);
 
             setRates({
                 gold: baseGold + (profile.premium_gold || 0),
                 silver: baseSilver + (profile.premium_silver || 0)
             });
+
+            // Update last synced info
+            const syncInfo = getLastSyncInfo();
+            if (syncInfo.timestamp) {
+                const syncTime = new Date(syncInfo.timestamp);
+                setLastSynced(`${syncTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} — ${syncInfo.source}`);
+            }
 
             // Fetch historical rates
             const yesterday = new Date(now);
@@ -104,19 +135,31 @@ export function RatesWidget() {
                 week: calcChange(baseSilver, weekAgoRate?.silver_tola_rate),
             });
 
+            setWidgetState("ready");
+        } catch (err) {
+            console.error("[RatesWidget] Load failed:", err);
+            setWidgetState(rates ? "ready" : "error");
         } finally {
             setRefreshing(false);
+            if (loadTimeoutRef.current) {
+                clearTimeout(loadTimeoutRef.current);
+                loadTimeoutRef.current = null;
+            }
         }
     }, [profile.premium_gold, profile.premium_silver]);
 
     useEffect(() => {
         loadRates();
-        const interval = setInterval(loadRates, 30 * 60 * 1000);
-        return () => clearInterval(interval);
+        // Refresh every 5 minutes for more responsive updates
+        const interval = setInterval(loadRates, 5 * 60 * 1000);
+        return () => {
+            clearInterval(interval);
+            if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+        };
     }, [loadRates]);
 
     return (
-        <Card className="bg-card/40 backdrop-blur-xl border-primary/20 bg-gradient-to-br from-card/80 to-card/10 shadow-2xl relative overflow-hidden group w-full">
+        <Card className="bg-card/40 backdrop-blur-xl border-primary/20 bg-gradient-to-br from-card/80 to-card/10 shadow-2xl relative overflow-hidden group w-full hover:shadow-primary/5 transition-shadow duration-500">
             <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
@@ -138,23 +181,49 @@ export function RatesWidget() {
                     </CardDescription>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                    <Button variant="ghost" size="sm" onClick={loadRates} disabled={refreshing} className="h-7 px-2 text-muted-foreground hover:text-primary">
+                    <Button variant="ghost" size="sm" onClick={loadRates} disabled={refreshing} className="h-7 px-2 text-muted-foreground hover:text-primary active:scale-90 transition-all">
                         <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                     </Button>
                     <span className="text-[10px] uppercase tracking-tighter text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {updateDate || "Synchronizing..."}
                     </span>
+                    {lastSynced && (
+                        <span className="text-[9px] text-muted-foreground/60 flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" />
+                            Last sync: {lastSynced}
+                        </span>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
-                {rates ? (
+                {/* Error State */}
+                {widgetState === "error" && (
+                    <div className="h-24 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                        <AlertCircle className="w-8 h-8 text-yellow-500" />
+                        <p className="text-sm">Could not fetch rates. Check your connection.</p>
+                        <Button variant="outline" size="sm" onClick={loadRates} className="text-xs active:scale-95 transition-transform">
+                            <RefreshCw className="w-3 h-3 mr-1" /> Try Again
+                        </Button>
+                    </div>
+                )}
+
+                {/* Loading State — bounded, never infinite */}
+                {widgetState === "loading" && (
+                    <div className="h-24 flex flex-col items-center justify-center gap-2">
+                        <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+                        <p className="text-xs text-muted-foreground animate-pulse">Fetching live rates...</p>
+                    </div>
+                )}
+
+                {/* Ready State */}
+                {widgetState === "ready" && rates && (
                     <>
                         {/* Main Rate Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Gold Card */}
-                            <div className="flex flex-col space-y-2 p-5 rounded-xl bg-background/30 border border-primary/10 hover:border-primary/40 transition-colors shadow-inner backdrop-blur-sm relative overflow-hidden">
-                                <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none">
+                            <div className="flex flex-col space-y-2 p-5 rounded-xl bg-background/30 border border-primary/10 hover:border-primary/40 transition-all duration-300 shadow-inner backdrop-blur-sm relative overflow-hidden group/card hover:shadow-lg hover:shadow-primary/5">
+                                <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none group-hover/card:opacity-10 transition-opacity">
                                     <Coins className="w-24 h-24" />
                                 </div>
                                 <span className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2 z-10">
@@ -183,8 +252,8 @@ export function RatesWidget() {
                             </div>
 
                             {/* Silver Card */}
-                            <div className="flex flex-col space-y-2 p-5 rounded-xl bg-background/30 border border-border hover:border-border/80 transition-colors shadow-inner backdrop-blur-sm relative overflow-hidden">
-                                <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none">
+                            <div className="flex flex-col space-y-2 p-5 rounded-xl bg-background/30 border border-border hover:border-border/80 transition-all duration-300 shadow-inner backdrop-blur-sm relative overflow-hidden group/card hover:shadow-lg">
+                                <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none group-hover/card:opacity-10 transition-opacity">
                                     <Coins className="w-24 h-24" />
                                 </div>
                                 <span className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2 z-10">
@@ -217,15 +286,11 @@ export function RatesWidget() {
                         <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground/60 uppercase tracking-widest pt-1">
                             <span>Source: FENEGOSIDA</span>
                             <span>•</span>
-                            <span>Auto-refresh: 30min</span>
+                            <span>Auto-refresh: 5min</span>
                             <span>•</span>
                             <span>Premium applied</span>
                         </div>
                     </>
-                ) : (
-                    <div className="h-24 flex items-center justify-center">
-                        <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-                    </div>
                 )}
             </CardContent>
         </Card>

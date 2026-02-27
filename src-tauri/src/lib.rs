@@ -15,6 +15,8 @@ struct LiveRates {
 async fn fetch_live_rates() -> Result<LiveRates, String> {
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true) // FENEGOSIDA has cert issues on www subdomain
+        .timeout(std::time::Duration::from_secs(15)) // 15-second hard timeout
+        .connect_timeout(std::time::Duration::from_secs(10)) // 10-second connect timeout
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
@@ -27,15 +29,21 @@ async fn fetch_live_rates() -> Result<LiveRates, String> {
 
     let body = response.text().await.map_err(|e| format!("Read error: {}", e))?;
 
-    // Parse rates from HTML. Format on the page:
-    // FINE GOLD (9999)per 1 tolaरु 315400
-    // TEJABI GOLDper 1 tolaरु 314700
-    // SILVERper 1 tolaरु 5725
-    let re_gold = regex::Regex::new(r"FINE GOLD.*?per 1 tola.*?(\d[\d,]+)")
+    // Parse rates from HTML using (?si) flag for multiline matching.
+    // IMPORTANT: The page lists rates TWICE: per 10 grm, then per 1 tola.
+    // We must NOT let the SILVER regex cross from the 10grm section past GOLD entries.
+    // Format:
+    //   FINE GOLD (9999)per 1 tolaरु 314900
+    //   TEJABI GOLDper 1 tolaरु 0
+    //   SILVERper 1 tolaरु 5740
+    //
+    // For GOLD/TEJABI: [^]* is fine because they appear before SILVER
+    // For SILVER: use tight anchor "SILVER\s*per 1 tola" to avoid crossing entries
+    let re_gold = regex::Regex::new(r"(?si)FINE\s*GOLD.*?per\s*1\s*tola\D{0,20}(\d[\d,]+)")
         .map_err(|e| format!("Regex error: {}", e))?;
-    let re_tejabi = regex::Regex::new(r"TEJABI GOLD.*?per 1 tola.*?(\d[\d,]+)")
+    let re_tejabi = regex::Regex::new(r"(?si)TEJABI\s*GOLD.*?per\s*1\s*tola\D{0,20}(\d[\d,]+)")
         .map_err(|e| format!("Regex error: {}", e))?;
-    let re_silver = regex::Regex::new(r"SILVER.*?per 1 tola.*?(\d[\d,]+)")
+    let re_silver = regex::Regex::new(r"(?i)SILVER\s*per\s*1\s*tola\D{0,20}(\d[\d,]+)")
         .map_err(|e| format!("Regex error: {}", e))?;
 
     let parse_rate = |re: &regex::Regex, html: &str| -> f64 {
@@ -49,13 +57,14 @@ async fn fetch_live_rates() -> Result<LiveRates, String> {
     let tejabi = parse_rate(&re_tejabi, &body);
     let silver = parse_rate(&re_silver, &body);
 
-    if hallmark == 0.0 {
-        return Err("Could not parse gold rates from FENEGOSIDA".into());
+    // Tolerate partial success: as long as gold OR silver parsed, return what we have
+    if hallmark == 0.0 && silver == 0.0 {
+        return Err("Could not parse any rates from FENEGOSIDA".into());
     }
 
     Ok(LiveRates {
         hallmark_gold: hallmark,
-        tejabi_gold: tejabi,
+        tejabi_gold: if tejabi > 0.0 { tejabi } else { hallmark }, // fallback tejabi to hallmark
         silver,
         source: "FENEGOSIDA".into(),
         timestamp: chrono::Local::now().to_rfc3339(),

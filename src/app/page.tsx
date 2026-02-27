@@ -315,46 +315,46 @@ export default function Home() {
 
           <div className="lg:col-span-2 grid grid-cols-2 gap-4">
             <Link href="/pos" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
                 <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                     <HandCoins className="w-6 h-6 text-primary" />
                   </div>
                   <span className="font-medium text-lg tracking-tight">New Sale</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                 </CardContent>
               </Card>
             </Link>
             <Link href="/inventory" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
                 <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                     <Package className="w-6 h-6 text-foreground" />
                   </div>
                   <span className="font-medium text-lg tracking-tight">Inventory</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                 </CardContent>
               </Card>
             </Link>
             <Link href="/reports" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
                 <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                     <BarChart3 className="w-6 h-6 text-blue-500" />
                   </div>
                   <span className="font-medium text-lg tracking-tight">Reports</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                 </CardContent>
               </Card>
             </Link>
             <Link href="/settings" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 group">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
                 <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                     <Settings className="w-6 h-6 text-foreground" />
                   </div>
                   <span className="font-medium text-lg tracking-tight">Settings</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                 </CardContent>
               </Card>
             </Link>
