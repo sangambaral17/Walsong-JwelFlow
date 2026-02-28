@@ -23,19 +23,24 @@ export const inventorySchema: RxJsonSchema<any> = {
 
 export const dhitoSchema: RxJsonSchema<any> = {
     title: 'dhito schema',
-    version: 0,
+    version: 1,
     description: 'describes a pawned item (dhito)',
     primaryKey: 'id',
     type: 'object',
     properties: {
         id: { type: 'string', maxLength: 100 },
         customer_name: { type: 'string' },
+        customer_phone: { type: 'string' },
         item_description: { type: 'string' },
+        gold_karat: { type: 'string' },          // "24K", "22K", "18K", "Silver"
         weight_grams: { type: 'number' },
         loan_amount: { type: 'number' },
         interest_rate: { type: 'number' },
         date_pawned: { type: 'string' },
-        status: { type: 'string' }
+        date_redeemed: { type: 'string' },
+        status: { type: 'string' },               // "active" | "redeemed" | "forfeited"
+        payments: { type: 'string' },              // JSON stringified PaymentEntry[]
+        notes: { type: 'string' },
     },
     required: ['id', 'customer_name', 'item_description', 'loan_amount', 'date_pawned']
 };

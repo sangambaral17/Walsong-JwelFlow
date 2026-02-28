@@ -18,7 +18,20 @@ let dbPromise: any = null;
 
 const collectionDefs = {
     inventory: { schema: inventorySchema },
-    dhito: { schema: dhitoSchema },
+    dhito: {
+        schema: dhitoSchema,
+        migrationStrategies: {
+            1: (oldDoc: any) => {
+                oldDoc.customer_phone = oldDoc.customer_phone || '';
+                oldDoc.gold_karat = oldDoc.gold_karat || '24K';
+                oldDoc.date_redeemed = oldDoc.date_redeemed || '';
+                oldDoc.payments = oldDoc.payments || '[]';
+                oldDoc.notes = oldDoc.notes || '';
+                if (!oldDoc.status) oldDoc.status = 'active';
+                return oldDoc;
+            }
+        }
+    },
     rates: { schema: ratesSchema },
     audit_log: { schema: auditLogSchema },
     shop_profile: { schema: shopProfileSchema },
