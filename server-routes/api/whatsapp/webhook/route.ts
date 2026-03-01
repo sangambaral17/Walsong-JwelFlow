@@ -12,8 +12,6 @@
  */
 import { NextRequest } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
 // ── GET — Meta Webhook Verification ──────────────────────────────────────────
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
