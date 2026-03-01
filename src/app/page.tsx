@@ -6,9 +6,11 @@ import { useAuth } from "@/lib/auth-context";
 import { BackupButton } from "@/components/settings/backup-button";
 import { EodModal } from "@/components/reports/eod-modal";
 import { useShop } from "@/lib/shop-context";
+import { useLang } from "@/lib/lang-context";
+import { LangToggle } from "@/components/ui/lang-toggle";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
+import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2, AlertTriangle, BarChart3, Hammer, Coins } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/db";
@@ -16,6 +18,7 @@ import { getDb } from "@/lib/db";
 export default function Home() {
   const { profile } = useShop();
   const { lockSession, user } = useAuth();
+  const { t } = useLang();
   const [showFinancials, setShowFinancials] = useState(false);
 
   // Live Stats State
@@ -144,28 +147,39 @@ export default function Home() {
             </div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground hidden sm:block">{profile.shop_name || "JwelFlow"}</h1>
           </div>
-          <nav className="flex items-center gap-6 text-xs font-medium text-muted-foreground uppercase tracking-widest">
+          <nav className="flex items-center gap-4 text-xs font-medium text-muted-foreground uppercase tracking-widest">
             <Link href="/pos" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <HandCoins className="w-3.5 h-3.5" /> POS
+              <HandCoins className="w-3.5 h-3.5" /> {t('pos')}
             </Link>
             <Link href="/inventory" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5" /> Inventory
+              <Package className="w-3.5 h-3.5" /> {t('inventory')}
             </Link>
             <Link href="/dhito" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <HandCoins className="w-3.5 h-3.5" /> Dhito
+              <HandCoins className="w-3.5 h-3.5" /> {t('dhito')}
             </Link>
             <Link href="/customers" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" /> Customers
+              <Users className="w-3.5 h-3.5" /> {t('customer')}
             </Link>
             <Link href="/reports" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5" /> Reports
+              <BarChart3 className="w-3.5 h-3.5" /> {t('reports')}
             </Link>
             <Link href="/settings" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5" /> Settings
+              <Settings className="w-3.5 h-3.5" /> {t('settings')}
+            </Link>
+            <Link href="/karigar" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <Hammer className="w-3.5 h-3.5" /> {t('karigar')}
+            </Link>
+            <Link href="/chit" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5" /> {t('chit')}
+            </Link>
+            <Link href="/audit" className="hover:text-primary transition-colors flex items-center gap-1.5 text-indigo-400">
+              <ShieldCheck className="w-3.5 h-3.5" /> {t('audit')}
             </Link>
             <div className="h-4 w-px bg-border/50 mx-1" />
+            <LangToggle />
+            <div className="h-4 w-px bg-border/50 mx-1" />
             <button onClick={lockSession} className="hover:text-destructive transition-colors flex items-center gap-1.5 font-bold">
-              <Lock className="w-3.5 h-3.5" /> Lock Session
+              <Lock className="w-3.5 h-3.5" /> {t('logout')}
             </button>
           </nav>
         </div>
@@ -355,6 +369,26 @@ export default function Home() {
                   </div>
                   <span className="font-medium text-lg tracking-tight">Settings</span>
                   <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/karigar" className="block group h-full">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
+                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Hammer className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-medium text-lg tracking-tight">Karigar</span>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/chit" className="block group h-full">
+              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
+                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
+                  <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Coins className="w-6 h-6 text-amber-500" />
+                  </div>
+                  <span className="font-medium text-lg tracking-tight">Gold Chit</span>
                 </CardContent>
               </Card>
             </Link>

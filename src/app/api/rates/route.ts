@@ -18,7 +18,14 @@
  */
 import { NextRequest } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
+    // If we are in static export generation, don't attempt live fetch
+    if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NODE_ENV === 'production') {
+        return Response.json({ hallmark_gold: 0, tejabi_gold: 0, silver: 0, source: "Static Link" });
+    }
+
     try {
         const response = await fetch("https://fenegosida.org/", {
             headers: {

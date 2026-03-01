@@ -3,6 +3,7 @@ import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { GlobalErrorBoundary } from "@/components/debug/error-boundary";
+import { Toaster } from "sonner";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body className={`${playfair.variable} ${inter.variable} font-sans antialiased`}>
         <GlobalErrorBoundary>
           <AppShell>{children}</AppShell>
+          <Toaster position="top-right" theme="dark" richColors />
         </GlobalErrorBoundary>
       </body>
     </html>

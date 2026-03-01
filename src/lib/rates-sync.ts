@@ -252,6 +252,12 @@ export async function syncMarketRates(): Promise<boolean> {
         lastSyncSource = source;
 
         console.log(`[RatesSync] Rates hydrated for ${today} — Source: ${source} | Gold: ${goldRate} | Silver: ${silverRate}`);
+
+        // Automatically reprice all inventory items against the fresh rate
+        if (source.includes("FENEGOSIDA") || source.includes("Cached")) {
+            await updateStockPricesFromRate(goldRate, silverRate);
+        }
+
         return source.includes("FENEGOSIDA");
     } catch (err) {
         console.error("[RatesSync] Sync failed:", err);
@@ -275,4 +281,50 @@ export async function fetchLiveRatesFromFederation() {
         source: live ? live.source : "Offline",
         timestamp: live?.timestamp || new Date().toISOString()
     };
+}
+
+/**
+ * Dynamically reprice all inventory items based on the current gold rate.
+ *
+ * Formula: SalePrice = (net_weight_grams / GRAMS_PER_TOLA × goldRatePerTola) + jyala
+ *
+ * Note: Only updates items with net_weight_grams > 0.
+ * Silver categories use the silver rate instead.
+ */
+export async function updateStockPricesFromRate(
+    goldRatePerTola: number,
+    silverRatePerTola: number
+): Promise<{ updated: number; skipped: number }> {
+    const GRAMS_PER_TOLA = 11.6638;
+    try {
+        const db = await getDb();
+        const allItems = await db.inventory.find().exec();
+
+        let updated = 0;
+        let skipped = 0;
+
+        for (const doc of allItems) {
+            const item = doc.toJSON();
+            const grams = item.net_weight_grams ?? 0;
+            if (grams <= 0) { skipped++; continue; }
+
+            const isSilver = (item.category ?? '').toLowerCase() === 'silver';
+            const ratePerTola = isSilver ? silverRatePerTola : goldRatePerTola;
+            const jyala = item.jyala ?? 0;
+
+            // SalePrice = (net_weight_grams / GRAMS_PER_TOLA × rate) + jyala
+            const salePrice = parseFloat(
+                ((grams / GRAMS_PER_TOLA) * ratePerTola + jyala).toFixed(2)
+            );
+
+            await doc.patch({ sale_price: salePrice });
+            updated++;
+        }
+
+        console.log(`[RatesSync] Stock repriced: ${updated} updated, ${skipped} skipped (no weight).`);
+        return { updated, skipped };
+    } catch (err) {
+        console.error('[RatesSync] updateStockPricesFromRate failed:', err);
+        return { updated: 0, skipped: 0 };
+    }
 }

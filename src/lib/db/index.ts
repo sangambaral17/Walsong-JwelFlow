@@ -2,7 +2,11 @@ import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
-import { inventorySchema, dhitoSchema, ratesSchema, auditLogSchema, shopProfileSchema, customerSchema, staffSchema, invoicesSchema } from './schemas';
+import {
+    inventorySchema, dhitoSchema, ratesSchema, auditLogSchema,
+    shopProfileSchema, customerSchema, staffSchema, invoicesSchema,
+    karigarSchema, karigarJobSchema, chitSchemeSchema, chitInstallmentSchema,
+} from './schemas';
 
 // Only add plugins once
 let pluginsAdded = false;
@@ -17,7 +21,17 @@ const initPlugins = () => {
 let dbPromise: any = null;
 
 const collectionDefs = {
-    inventory: { schema: inventorySchema },
+    inventory: {
+        schema: inventorySchema,
+        migrationStrategies: {
+            // v0 → v1: backfill sale_price and rfid_tag
+            1: (oldDoc: any) => {
+                oldDoc.sale_price = 0;
+                oldDoc.rfid_tag = '';
+                return oldDoc;
+            }
+        }
+    },
     dhito: {
         schema: dhitoSchema,
         migrationStrategies: {
@@ -46,9 +60,23 @@ const collectionDefs = {
                 oldDoc.paid_amount = oldDoc.grand_total ?? 0;
                 oldDoc.balance_due = 0;
                 return oldDoc;
+            },
+            // v1 → v2: backfill AML / KYC compliance fields
+            2: (oldDoc: any) => {
+                oldDoc.aml_flagged = false;
+                oldDoc.kyc_name = '';
+                oldDoc.kyc_id_type = '';
+                oldDoc.kyc_id_number = '';
+                oldDoc.kyc_address = '';
+                return oldDoc;
             }
         }
-    }
+    },
+    // ─── New collections (Module 2 & 4) ──────────────────────────────────────
+    karigar: { schema: karigarSchema },
+    karigar_jobs: { schema: karigarJobSchema },
+    chit_schemes: { schema: chitSchemeSchema },
+    chit_installments: { schema: chitInstallmentSchema },
 };
 
 const createDB = async () => {
@@ -84,7 +112,7 @@ export const getDb = () => {
 
 export const resetDatabase = async () => {
     const db = await getDb();
-    const collections = ['inventory', 'dhito', 'rates', 'audit_log', 'customers', 'staff', 'invoices'];
+    const collections = ['inventory', 'dhito', 'rates', 'audit_log', 'customers', 'staff', 'invoices', 'karigar', 'karigar_jobs', 'chit_schemes', 'chit_installments'];
 
     // Wipe all business data but keep ShopProfile for branding persistence
     for (const name of collections) {
@@ -107,7 +135,7 @@ export const resetDatabase = async () => {
 
 export const exportEncryptedBackup = async () => {
     const db = await getDb();
-    const collectionNames = ['inventory', 'dhito', 'rates', 'audit_log', 'shop_profile', 'customers', 'staff', 'invoices'];
+    const collectionNames = ['inventory', 'dhito', 'rates', 'audit_log', 'shop_profile', 'customers', 'staff', 'invoices', 'karigar', 'karigar_jobs', 'chit_schemes', 'chit_installments'];
     const backup: Record<string, any[]> = {};
 
     for (const name of collectionNames) {

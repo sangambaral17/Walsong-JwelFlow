@@ -6,6 +6,7 @@ import { safeUUID } from "@/lib/utils/safe-uuid";
 import { toGrams, calculateFinalPrice, formatTML, toTolaMashaLal } from "@/lib/jewelry-math";
 import { useShop } from "@/lib/shop-context";
 import { useAuth } from "@/lib/auth-context";
+import { validateAML, isAmlTriggered, amlThresholdDisplay, type KycFields } from "@/lib/compliance";
 import Decimal from "decimal.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,15 @@ export default function POSPage() {
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [isPartialPayment, setIsPartialPayment] = useState(false);
     const [paidAmountInput, setPaidAmountInput] = useState("");
+
+    // AML / KYC state
+    const [kyc, setKyc] = useState<KycFields>({
+        kyc_name: "",
+        kyc_id_type: "",
+        kyc_id_number: "",
+        kyc_address: "",
+    });
+    const [amlErrors, setAmlErrors] = useState<string[]>([]);
 
     // Inventory search state
     const [inventorySearch, setInventorySearch] = useState("");
@@ -222,6 +232,16 @@ export default function POSPage() {
             return;
         }
 
+        // ─── AML Compliance Check ────────────────────────────────────────────
+        const amlResult = validateAML(grandTotal, paymentMethod, kyc);
+        if (!amlResult.valid) {
+            setAmlErrors(amlResult.errors);
+            return;
+        }
+        setAmlErrors([]);
+        const amlFlagged = amlResult.aml_triggered;
+        // ─────────────────────────────────────────────────────────────────────
+
         const db = await getDb();
         const invoiceId = `INV-${Date.now().toString(36).toUpperCase()}`;
 
@@ -297,6 +317,12 @@ export default function POSPage() {
             cashier: invoiceData.cashier,
             payment_method: effectivePaymentMethod,
             notes: "",
+            // AML / KYC fields
+            aml_flagged: amlFlagged,
+            kyc_name: amlFlagged ? kyc.kyc_name : "",
+            kyc_id_type: amlFlagged ? kyc.kyc_id_type : "",
+            kyc_id_number: amlFlagged ? kyc.kyc_id_number : "",
+            kyc_address: amlFlagged ? kyc.kyc_address : "",
         });
 
         // Save new customer if not already in DB
@@ -319,6 +345,8 @@ export default function POSPage() {
         setCart([]);
         setIsPartialPayment(false);
         setPaidAmountInput("");
+        setKyc({ kyc_name: "", kyc_id_type: "", kyc_id_number: "", kyc_address: "" });
+        setAmlErrors([]);
     };
 
     const handlePrintInvoice = () => {
@@ -867,21 +895,94 @@ export default function POSPage() {
                                         <span className="text-2xl font-bold text-primary font-mono">रू {grandTotal.toFixed(2)}</span>
                                     </div>
 
-                                    {/* Payment Method */}
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {(["cash", "bank", "credit"] as const).map((m) => (
-                                            <button
-                                                key={m}
-                                                onClick={() => setPaymentMethod(m)}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all capitalize ${paymentMethod === m
-                                                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
-                                                    : "border-border/40 text-muted-foreground hover:border-primary/40"
-                                                    }`}
-                                            >
-                                                {m === "cash" ? "💵 Cash" : m === "bank" ? "🏦 Bank" : "📋 Credit"}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    {/* Payment Method — Cash disabled if AML triggered */}
+                                    {(() => {
+                                        const amlActive = isAmlTriggered(grandTotal);
+                                        return (
+                                            <div className="space-y-2">
+                                                {amlActive && (
+                                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                                                        <span className="text-red-400 text-xs shrink-0 mt-0.5">🚫</span>
+                                                        <p className="text-xs text-red-400 leading-relaxed">
+                                                            <strong>AML Alert:</strong> Transaction ≥ {amlThresholdDisplay()}.<br />
+                                                            Cash payment disabled. KYC is mandatory.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {(["cash", "bank", "credit"] as const).map((m) => (
+                                                        <button
+                                                            key={m}
+                                                            onClick={() => {
+                                                                if (m === "cash" && amlActive) return;
+                                                                setPaymentMethod(m);
+                                                            }}
+                                                            disabled={m === "cash" && amlActive}
+                                                            className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all capitalize ${m === "cash" && amlActive
+                                                                    ? "border-border/20 text-muted-foreground/30 cursor-not-allowed line-through"
+                                                                    : paymentMethod === m
+                                                                        ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
+                                                                        : "border-border/40 text-muted-foreground hover:border-primary/40"
+                                                                }`}
+                                                        >
+                                                            {m === "cash" ? "💵 Cash" : m === "bank" ? "🏦 Bank" : "📋 Credit"}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* KYC Form — shown only when AML is triggered */}
+                                                {amlActive && (
+                                                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-3">
+                                                        <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">🪪 KYC Required (AML Compliance)</p>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="col-span-2">
+                                                                <Label className="text-xs text-muted-foreground">Full Legal Name *</Label>
+                                                                <Input
+                                                                    value={kyc.kyc_name}
+                                                                    onChange={e => setKyc(k => ({ ...k, kyc_name: e.target.value }))}
+                                                                    placeholder="As on ID document"
+                                                                    className="mt-1 h-8 text-xs bg-background/50 border-amber-500/30"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <Label className="text-xs text-muted-foreground">ID Type *</Label>
+                                                                <select
+                                                                    value={kyc.kyc_id_type}
+                                                                    onChange={e => setKyc(k => ({ ...k, kyc_id_type: e.target.value as any }))}
+                                                                    className="mt-1 w-full h-8 rounded-md border border-amber-500/30 bg-background/50 px-2 text-xs"
+                                                                >
+                                                                    <option value="">Select...</option>
+                                                                    <option value="citizenship">Citizenship</option>
+                                                                    <option value="passport">Passport</option>
+                                                                    <option value="license">Driving License</option>
+                                                                    <option value="voter">Voter ID</option>
+                                                                    <option value="pan">PAN Card</option>
+                                                                </select>
+                                                            </div>
+                                                            <div>
+                                                                <Label className="text-xs text-muted-foreground">ID Number *</Label>
+                                                                <Input
+                                                                    value={kyc.kyc_id_number}
+                                                                    onChange={e => setKyc(k => ({ ...k, kyc_id_number: e.target.value }))}
+                                                                    placeholder="123-45-6789"
+                                                                    className="mt-1 h-8 text-xs bg-background/50 border-amber-500/30"
+                                                                />
+                                                            </div>
+                                                            <div className="col-span-2">
+                                                                <Label className="text-xs text-muted-foreground">Address *</Label>
+                                                                <Input
+                                                                    value={kyc.kyc_address}
+                                                                    onChange={e => setKyc(k => ({ ...k, kyc_address: e.target.value }))}
+                                                                    placeholder="Ward, District, Province"
+                                                                    className="mt-1 h-8 text-xs bg-background/50 border-amber-500/30"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* Partial Payment Toggle */}
                                     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2">
@@ -918,6 +1019,15 @@ export default function POSPage() {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* AML Validation Errors */}
+                                    {amlErrors.length > 0 && (
+                                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-1">
+                                            {amlErrors.map((err, i) => (
+                                                <p key={i} className="text-xs text-red-400">⚠ {err}</p>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     <Button
                                         onClick={handleCheckout}
