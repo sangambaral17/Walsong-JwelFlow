@@ -2,6 +2,7 @@
 
 import { ShopProvider, useShop } from "@/lib/shop-context";
 import { AuthProvider } from "@/lib/auth-context";
+import { LangProvider } from "@/lib/lang-context";
 import { SetupWizard } from "@/components/setup/setup-wizard";
 
 function AppGate({ children }: { children: React.ReactNode }) {
@@ -27,10 +28,12 @@ function AppGate({ children }: { children: React.ReactNode }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
     return (
-        <ShopProvider>
-            <AuthProvider>
-                <AppGate>{children}</AppGate>
-            </AuthProvider>
-        </ShopProvider>
+        <LangProvider>
+            <ShopProvider>
+                <AuthProvider>
+                    <AppGate>{children}</AppGate>
+                </AuthProvider>
+            </ShopProvider>
+        </LangProvider>
     );
 }

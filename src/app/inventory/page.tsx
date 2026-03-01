@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getDb } from "@/lib/db";
+import { safeUUID } from "@/lib/utils/safe-uuid";
 import { toGrams, formatTML, toTolaMashaLal } from "@/lib/jewelry-math";
 import { PinLock } from "@/components/auth/pin-lock";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ export default function InventoryPage() {
         });
 
         await db.inventory.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             name: form.name,
             category: form.category,
             weight_tola: Number(form.tola) || 0,
@@ -77,7 +78,7 @@ export default function InventoryPage() {
 
         // Write audit log
         await db.audit_log.insert({
-            id: crypto.randomUUID(),
+            id: safeUUID(),
             timestamp: new Date().toISOString(),
             action: "INVENTORY_ADD",
             details: `Added ${form.name} (${weightGrams.toFixed(2)}g)`,
@@ -93,7 +94,7 @@ export default function InventoryPage() {
         const doc = await db.inventory.findOne(id).exec();
         if (doc) {
             await db.audit_log.insert({
-                id: crypto.randomUUID(),
+                id: safeUUID(),
                 timestamp: new Date().toISOString(),
                 action: "INVENTORY_DELETE",
                 details: `Removed ${doc.name}`,

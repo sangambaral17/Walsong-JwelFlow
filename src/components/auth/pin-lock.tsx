@@ -82,8 +82,8 @@ export function PinLock({ children, requiredRole }: PinLockProps) {
     }
 
     return (
-        <div className="relative group w-full">
-            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="relative w-full">
+            <div className="flex justify-end mb-2">
                 <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground hover:text-foreground hover:bg-background/50 backdrop-blur-sm">
                     <Unlock className="w-4 h-4 mr-2" />
                     Lock View ({user.name})

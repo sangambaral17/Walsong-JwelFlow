@@ -169,22 +169,113 @@
 .glass-card:hover {
   border-color: rgba(212, 175, 55, 0.35);
   box-shadow: 0 0 40px rgba(212, 175, 55, 0.05);
+  transform: translateY(-1px);
 }
 
-/* Print styles for 80mm thermal receipt */
+/* ─── Premium Micro-Interactions ─── */
+
+/* Button press feedback */
+button,
+a[href],
+[role="button"] {
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+}
+
+button:active:not(:disabled),
+a[href]:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* Nav link hover underline */
+nav a {
+  position: relative;
+}
+
+nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 1.5px;
+  background: var(--primary);
+  transition: width 0.25s ease, left 0.25s ease;
+}
+
+nav a:hover::after {
+  width: 100%;
+  left: 0;
+}
+
+/* Card lift & glow on hover */
+.glass-card {
+  transition: transform 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Smooth focus rings */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  transition: outline-offset 0.15s ease;
+}
+
+/* Input focus glow */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
+}
+
+/* =====================================================
+   PRINT STYLES — Forces perfect white invoice printout
+   Overcomes dark theme, removes all bleed-through
+   ===================================================== */
 @media print {
   @page {
-    size: 80mm auto;
-    margin: 2mm;
+    size: auto;
+    margin: 8mm;
   }
 
-  body {
+  /* Hard reset: force white background + black text on everything */
+  html,
+  body,
+  body * {
     background: white !important;
-    color: black !important;
-    font-size: 12px;
+    background-color: white !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
   }
 
-  .no-print {
+  /* Hide all app UI — only the printable invoice should show */
+  .no-print,
+  header,
+  nav,
+  aside,
+  footer,
+  [role="dialog"],
+  [data-radix-popper-content-wrapper] {
     display: none !important;
+  }
+
+  /* Make printable invoice visible */
+  #printable-invoice {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Table cell borders remain visible as defined inline */
+  table,
+  th,
+  td {
+    border-color: #000 !important;
+  }
+
+  /* Ensure borders in print remain visible */
+  .print-border {
+    border: 1px solid #000 !important;
   }
 }

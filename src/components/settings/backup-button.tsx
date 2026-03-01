@@ -19,6 +19,9 @@ export function BackupButton() {
             const dhito = await db.dhito.find().exec();
             const rates = await db.rates.find().exec();
             const auditLog = await db.audit_log.find().exec();
+            const customers = await db.customers.find().exec();
+            const staff = await db.staff.find().exec();
+            const shopProfile = await db.shop_profile.find().exec();
 
             const exportData = {
                 timestamp: new Date().toISOString(),
@@ -32,6 +35,12 @@ export function BackupButton() {
                     rates: rates.map((d: any) => d.toJSON()),
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     audit_log: auditLog.map((d: any) => d.toJSON()),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    customers: customers.map((d: any) => d.toJSON()),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    staff: staff.map((d: any) => d.toJSON()),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    shop_profile: shopProfile.map((d: any) => d.toJSON()),
                 }
             };
 
