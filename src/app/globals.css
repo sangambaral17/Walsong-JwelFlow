@@ -49,43 +49,51 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   PREMIUM WARM-LIGHT THEME — Luxury Jewelry App
+   Warm parchment whites, deep gold accents, clean shadows
+   ═══════════════════════════════════════════════════════════════════════ */
+
 :root {
   --radius: 0.625rem;
-  --gold: #D4AF37;
-  --gold-dim: #B8962E;
-  --background: #121212;
-  --foreground: #F5F0E8;
-  --card: #1A1A1A;
-  --card-foreground: #F5F0E8;
-  --popover: #1A1A1A;
-  --popover-foreground: #F5F0E8;
-  --primary: #D4AF37;
-  --primary-foreground: #121212;
-  --secondary: #1F1F1F;
-  --secondary-foreground: #D4AF37;
-  --muted: #1C1C1C;
-  --muted-foreground: #9A9078;
-  --accent: #252218;
-  --accent-foreground: #F5F0E8;
-  --destructive: #E04040;
-  --border: #2A2520;
-  --input: #2A2520;
-  --ring: #D4AF37;
-  --chart-1: #D4AF37;
-  --chart-2: #B8962E;
-  --chart-3: #E8D48B;
-  --chart-4: #8B7355;
-  --chart-5: #F5E6B8;
-  --sidebar: #161616;
-  --sidebar-foreground: #F5F0E8;
-  --sidebar-primary: #D4AF37;
-  --sidebar-primary-foreground: #121212;
-  --sidebar-accent: #1F1F1F;
-  --sidebar-accent-foreground: #D4AF37;
-  --sidebar-border: #2A2520;
-  --sidebar-ring: #D4AF37;
+  --gold: #B8962E;
+  --gold-dim: #9A7B1F;
+
+  /* Warm parchment light palette */
+  --background: #FDFBF7;
+  --foreground: #1A1611;
+  --card: #FFFFFF;
+  --card-foreground: #1A1611;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1611;
+  --primary: #B8962E;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0EBE0;
+  --secondary-foreground: #5C4A2A;
+  --muted: #F5F0E8;
+  --muted-foreground: #8B7355;
+  --accent: #EDE6D6;
+  --accent-foreground: #1A1611;
+  --destructive: #DC3545;
+  --border: #E8E0D0;
+  --input: #E8E0D0;
+  --ring: #B8962E;
+  --chart-1: #B8962E;
+  --chart-2: #D4AF37;
+  --chart-3: #8B7355;
+  --chart-4: #C9B97A;
+  --chart-5: #5C4A2A;
+  --sidebar: #FAF7F2;
+  --sidebar-foreground: #1A1611;
+  --sidebar-primary: #B8962E;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F0EBE0;
+  --sidebar-accent-foreground: #B8962E;
+  --sidebar-border: #E8E0D0;
+  --sidebar-ring: #B8962E;
 }
 
+/* Dark variant — kept for accessibility / future toggle */
 .dark {
   --background: #121212;
   --foreground: #F5F0E8;
@@ -138,7 +146,41 @@
   }
 }
 
-/* Luxury shimmer animation */
+/* ─── Premium Glass Card — Light Mode ─── */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(184, 150, 46, 0.12);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 3px rgba(26, 22, 17, 0.04),
+    0 4px 16px rgba(26, 22, 17, 0.03);
+  transition: transform 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(184, 150, 46, 0.3);
+  box-shadow:
+    0 2px 8px rgba(184, 150, 46, 0.08),
+    0 8px 32px rgba(26, 22, 17, 0.06);
+  transform: translateY(-1px);
+}
+
+/* Dark variant */
+.dark .glass-card {
+  background: rgba(26, 26, 26, 0.6);
+  border-color: rgba(212, 175, 55, 0.15);
+  box-shadow: none;
+}
+
+.dark .glass-card:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 0 40px rgba(212, 175, 55, 0.05);
+}
+
+/* ─── Gold Shimmer Animation ─── */
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -152,6 +194,17 @@
 .gold-shimmer {
   background: linear-gradient(90deg,
       transparent 0%,
+      rgba(184, 150, 46, 0.04) 25%,
+      rgba(184, 150, 46, 0.08) 50%,
+      rgba(184, 150, 46, 0.04) 75%,
+      transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 5s ease-in-out infinite;
+}
+
+.dark .gold-shimmer {
+  background: linear-gradient(90deg,
+      transparent 0%,
       rgba(212, 175, 55, 0.08) 25%,
       rgba(212, 175, 55, 0.15) 50%,
       rgba(212, 175, 55, 0.08) 75%,
@@ -160,21 +213,8 @@
   animation: shimmer 4s ease-in-out infinite;
 }
 
-.glass-card {
-  background: rgba(26, 26, 26, 0.6);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(212, 175, 55, 0.15);
-}
-
-.glass-card:hover {
-  border-color: rgba(212, 175, 55, 0.35);
-  box-shadow: 0 0 40px rgba(212, 175, 55, 0.05);
-  transform: translateY(-1px);
-}
-
 /* ─── Premium Micro-Interactions ─── */
 
-/* Button press feedback */
 button,
 a[href],
 [role="button"] {
@@ -208,11 +248,6 @@ nav a:hover::after {
   left: 0;
 }
 
-/* Card lift & glow on hover */
-.glass-card {
-  transition: transform 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
 /* Smooth focus rings */
 *:focus-visible {
   outline: 2px solid var(--primary);
@@ -224,12 +259,31 @@ nav a:hover::after {
 input:focus,
 textarea:focus,
 select:focus {
+  box-shadow: 0 0 0 2px rgba(184, 150, 46, 0.12);
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
   box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
+}
+
+/* ─── Warm Background Gradient (Subtle) ─── */
+
+.warm-bg-gradient {
+  background:
+    radial-gradient(ellipse 800px 400px at 50% 0%, rgba(184, 150, 46, 0.04), transparent),
+    linear-gradient(180deg, #FDFBF7 0%, #FAF7F2 100%);
+}
+
+.dark .warm-bg-gradient {
+  background:
+    radial-gradient(ellipse 800px 400px at 50% 0%, rgba(212, 175, 55, 0.03), transparent),
+    linear-gradient(180deg, #121212 0%, #0E0E0E 100%);
 }
 
 /* =====================================================
    PRINT STYLES — Forces perfect white invoice printout
-   Overcomes dark theme, removes all bleed-through
    ===================================================== */
 @media print {
   @page {
@@ -237,7 +291,6 @@ select:focus {
     margin: 8mm;
   }
 
-  /* Hard reset: force white background + black text on everything */
   html,
   body,
   body * {
@@ -250,7 +303,6 @@ select:focus {
     text-shadow: none !important;
   }
 
-  /* Hide all app UI — only the printable invoice should show */
   .no-print,
   header,
   nav,
@@ -261,20 +313,17 @@ select:focus {
     display: none !important;
   }
 
-  /* Make printable invoice visible */
   #printable-invoice {
     display: block !important;
     width: 100% !important;
   }
 
-  /* Table cell borders remain visible as defined inline */
   table,
   th,
   td {
     border-color: #000 !important;
   }
 
-  /* Ensure borders in print remain visible */
   .print-border {
     border: 1px solid #000 !important;
   }

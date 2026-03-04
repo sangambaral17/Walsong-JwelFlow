@@ -7,10 +7,10 @@ import { BackupButton } from "@/components/settings/backup-button";
 import { EodModal } from "@/components/reports/eod-modal";
 import { useShop } from "@/lib/shop-context";
 import { useLang } from "@/lib/lang-context";
-import { LangToggle } from "@/components/ui/lang-toggle";
+import { GlobalNav } from "@/components/global-nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Users, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2, AlertTriangle, BarChart3, Hammer, Coins } from "lucide-react";
+import { Package, Settings, HandCoins, ShieldCheck, ArrowRight, Lock, Eye, EyeOff, TrendingUp, History, CheckCircle2, AlertTriangle, BarChart3, Hammer, Coins } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/db";
@@ -18,17 +18,15 @@ import { getDb } from "@/lib/db";
 export default function Home() {
   const { profile } = useShop();
   const { lockSession, user } = useAuth();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [showFinancials, setShowFinancials] = useState(false);
 
-  // Live Stats State
   const [stats, setStats] = useState({
     goldWeight: { t: 0, m: 0, l: 0 },
     silverWeight: { t: 0, m: 0, l: 0 },
     revenueDay: 0,
     dhitoLiability: 0,
     itemCount: 0,
-    // New dashboard metrics
     txCountToday: 0,
     cashTotal: 0,
     digitalTotal: 0,
@@ -39,8 +37,6 @@ export default function Home() {
   useEffect(() => {
     const fetchStats = async () => {
       const db = await getDb();
-
-      // 1. Gold Stock
       const inventory = await db.inventory.find().exec();
       let totalGoldGrams = 0;
       let totalSilverGrams = 0;
@@ -48,18 +44,11 @@ export default function Home() {
 
       inventory.forEach((item: any) => {
         const grams = item.net_weight_grams || 0;
-        if (item.category?.toLowerCase().includes('gold')) {
-          totalGoldGrams += grams;
-        } else if (item.category?.toLowerCase().includes('silver')) {
-          totalSilverGrams += grams;
-        }
-        // Low stock = items with weight below 2 grams
-        if (grams > 0 && grams < 2) {
-          lowStockItems.push({ name: item.name, category: item.category, grams });
-        }
+        if (item.category?.toLowerCase().includes('gold')) totalGoldGrams += grams;
+        else if (item.category?.toLowerCase().includes('silver')) totalSilverGrams += grams;
+        if (grams > 0 && grams < 2) lowStockItems.push({ name: item.name, category: item.category, grams });
       });
 
-      // Simple Grams to T/M/L conversion (Approx: 1 Tola = 11.66g, 1 Masha = 0.97g, 1 Lal = 0.01g)
       const toTML = (grams: number) => {
         const t = Math.floor(grams / 11.6639);
         const remainingAfterT = grams % 11.6639;
@@ -68,21 +57,15 @@ export default function Home() {
         return { t, m, l };
       };
 
-      // 2. Today's invoices (real data, not audit log)
       const allInvoices = await db.invoices.find().exec();
       const today = new Date().toISOString().split('T')[0];
-      let revenue = 0;
-      let txCount = 0;
-      let cashTotal = 0;
-      let digitalTotal = 0;
-      let creditTotal = 0;
+      let revenue = 0, txCount = 0, cashTotal = 0, digitalTotal = 0, creditTotal = 0;
 
       allInvoices.forEach((doc: any) => {
         const inv = doc.toJSON();
         if (inv.date && inv.date.startsWith(today)) {
           revenue += inv.grand_total || 0;
           txCount += 1;
-
           const method = (inv.payment_method || "cash").toLowerCase();
           if (method === "cash") cashTotal += inv.grand_total || 0;
           else if (method === "bank") digitalTotal += inv.grand_total || 0;
@@ -91,10 +74,7 @@ export default function Home() {
         }
       });
 
-      // 3. Dhito Liability
-      const dhitos = await db.dhito.find({
-        selector: { status: 'active' }
-      }).exec();
+      const dhitos = await db.dhito.find({ selector: { status: 'active' } }).exec();
       let liability = 0;
       dhitos.forEach((d: any) => liability += d.loan_amount || 0);
 
@@ -105,24 +85,18 @@ export default function Home() {
         dhitoLiability: liability,
         itemCount: inventory.length,
         txCountToday: txCount,
-        cashTotal,
-        digitalTotal,
-        creditTotal,
+        cashTotal, digitalTotal, creditTotal,
         lowStockItems: lowStockItems.slice(0, 5),
       });
     };
 
     fetchStats();
-
-    // Subscribe to changes
     const dbPromise = getDb();
-    let sub: any;
-    let sub2: any;
+    let sub: any, sub2: any;
     dbPromise.then((db: any) => {
       sub = db.inventory.find().$.subscribe(() => fetchStats());
       sub2 = db.invoices.find().$.subscribe(() => fetchStats());
     });
-
     return () => { sub?.unsubscribe(); sub2?.unsubscribe(); };
   }, []);
 
@@ -132,65 +106,15 @@ export default function Home() {
   const digitalPercent = totalDayPayments > 0 ? Math.round((stats.digitalTotal / totalDayPayments) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
-      {/* Subtle radial glow behind header */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full bg-primary/3 blur-[120px]" />
-      </div>
+    <div className="min-h-screen warm-bg-gradient text-foreground selection:bg-primary/30">
+      <GlobalNav />
 
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/70 backdrop-blur-xl transition-all print:hidden">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B8962E] flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="text-black font-bold text-xl leading-none tracking-tighter">W</span>
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground hidden sm:block">{profile.shop_name || "JwelFlow"}</h1>
-          </div>
-          <nav className="flex items-center gap-4 text-xs font-medium text-muted-foreground uppercase tracking-widest">
-            <Link href="/pos" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <HandCoins className="w-3.5 h-3.5" /> {t('pos')}
-            </Link>
-            <Link href="/inventory" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5" /> {t('inventory')}
-            </Link>
-            <Link href="/dhito" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <HandCoins className="w-3.5 h-3.5" /> {t('dhito')}
-            </Link>
-            <Link href="/customers" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" /> {t('customer')}
-            </Link>
-            <Link href="/reports" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <BarChart3 className="w-3.5 h-3.5" /> {t('reports')}
-            </Link>
-            <Link href="/settings" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5" /> {t('settings')}
-            </Link>
-            <Link href="/karigar" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Hammer className="w-3.5 h-3.5" /> {t('karigar')}
-            </Link>
-            <Link href="/chit" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5" /> {t('chit')}
-            </Link>
-            <Link href="/audit" className="hover:text-primary transition-colors flex items-center gap-1.5 text-indigo-400">
-              <ShieldCheck className="w-3.5 h-3.5" /> {t('audit')}
-            </Link>
-            <div className="h-4 w-px bg-border/50 mx-1" />
-            <LangToggle />
-            <div className="h-4 w-px bg-border/50 mx-1" />
-            <button onClick={lockSession} className="hover:text-destructive transition-colors flex items-center gap-1.5 font-bold">
-              <Lock className="w-3.5 h-3.5" /> {t('logout')}
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-10 space-y-12 max-w-7xl relative z-10 print:hidden">
-        {/* Welcome Section */}
-        <section className="flex items-center justify-between pt-4">
-          <div className="space-y-2">
-            <h2 className="text-4xl font-medium tracking-tight">Welcome, {user?.name || "Walsong Group"}</h2>
-            <p className="text-muted-foreground text-lg">Manage inventory, process sales, and monitor real-time market rates.</p>
+      <main className="container mx-auto px-4 py-8 space-y-10 max-w-7xl relative z-10 print:hidden">
+        {/* Welcome */}
+        <section className="flex items-center justify-between pt-2">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-medium tracking-tight">{t('welcome')}, {user?.name || "Walsong Group"}</h2>
+            <p className="text-muted-foreground text-base">{t('manageInventory')}</p>
           </div>
           <div className="flex items-center gap-3">
             {isOwner && (
@@ -200,18 +124,21 @@ export default function Home() {
                 onClick={() => setShowFinancials(!showFinancials)}
                 className="bg-card/50 backdrop-blur-md border-primary/20 hover:border-primary/50 transition-all"
               >
-                {showFinancials ? <><EyeOff className="w-4 h-4 mr-2 text-primary" /> Mask Financials</> : <><Eye className="w-4 h-4 mr-2 text-primary" /> Reveal Financials</>}
+                {showFinancials
+                  ? <><EyeOff className="w-4 h-4 mr-2 text-primary" /> {t('maskFinancials')}</>
+                  : <><Eye className="w-4 h-4 mr-2 text-primary" /> {t('revealFinancials')}</>
+                }
               </Button>
             )}
             <EodModal />
           </div>
         </section>
 
-        {/* ===== TODAY AT A GLANCE (New Section) ===== */}
+        {/* Today at a Glance */}
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="glass-card border-primary/20">
             <CardContent className="p-5">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">आजको बिक्री (Today&apos;s Sales)</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{t('todaySales')}</p>
               <p className="text-3xl font-bold font-mono text-primary tracking-tight">
                 रू {stats.revenueDay.toLocaleString()}
               </p>
@@ -219,19 +146,17 @@ export default function Home() {
           </Card>
           <Card className="glass-card">
             <CardContent className="p-5">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Transactions Today</p>
-              <p className="text-3xl font-bold font-mono text-foreground tracking-tight">
-                {stats.txCountToday}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">invoices generated</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{t('transactionsToday')}</p>
+              <p className="text-3xl font-bold font-mono text-foreground tracking-tight">{stats.txCountToday}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('invoicesGenerated')}</p>
             </CardContent>
           </Card>
           <Card className="glass-card">
             <CardContent className="p-5">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Cash vs Digital</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{t('cashVsDigital')}</p>
               {totalDayPayments > 0 ? (
                 <>
-                  <div className="flex h-3 rounded-full overflow-hidden bg-background/50 border border-border/30">
+                  <div className="flex h-3 rounded-full overflow-hidden bg-muted border border-border/30">
                     <div className="bg-green-500 transition-all" style={{ width: `${cashPercent}%` }} />
                     <div className="bg-blue-500 transition-all" style={{ width: `${digitalPercent}%` }} />
                     <div className="bg-orange-500 flex-1" />
@@ -243,17 +168,15 @@ export default function Home() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">No payments today</p>
+                <p className="text-sm text-muted-foreground">{t('noPaymentsToday')}</p>
               )}
             </CardContent>
           </Card>
           <Card className="glass-card">
             <CardContent className="p-5">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Inventory Items</p>
-              <p className="text-3xl font-bold font-mono text-foreground tracking-tight">
-                {stats.itemCount}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">total items in stock</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{t('inventoryItems')}</p>
+              <p className="text-3xl font-bold font-mono text-foreground tracking-tight">{stats.itemCount}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('totalItemsInStock')}</p>
             </CardContent>
           </Card>
         </section>
@@ -263,8 +186,8 @@ export default function Home() {
           <section>
             <Card className="glass-card border-orange-500/20 bg-orange-500/5">
               <CardHeader className="pb-2">
-                <CardTitle className="text-orange-500 flex items-center gap-2 text-base">
-                  <AlertTriangle className="w-5 h-5" /> Low Stock Alert
+                <CardTitle className="text-orange-600 flex items-center gap-2 text-base">
+                  <AlertTriangle className="w-5 h-5" /> {t('lowStockAlert')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -275,7 +198,7 @@ export default function Home() {
                         <p className="text-sm font-medium">{item.name}</p>
                         <p className="text-xs text-muted-foreground">{item.category}</p>
                       </div>
-                      <span className="text-xs font-mono text-orange-500 font-semibold">{item.grams.toFixed(2)}g</span>
+                      <span className="text-xs font-mono text-orange-600 font-semibold">{item.grams.toFixed(2)}g</span>
                     </div>
                   ))}
                 </div>
@@ -284,28 +207,25 @@ export default function Home() {
           </section>
         )}
 
-        {/* Zero State / Welcome Banner */}
+        {/* Welcome Banner (Zero State) */}
         {stats.itemCount === 0 && (
-          <div className="glass-card border-primary/20 bg-gradient-to-r from-primary/10 via-background to-transparent p-8 rounded-2xl flex items-center justify-between overflow-hidden relative group">
-            <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-1000"></div>
+          <div className="glass-card border-primary/20 bg-gradient-to-r from-primary/5 via-background to-transparent p-8 rounded-2xl flex items-center justify-between overflow-hidden relative group">
+            <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-1000" />
             <div className="space-y-4 relative z-10 max-w-xl">
               <div className="flex items-center gap-2 text-primary font-bold uppercase tracking-widest text-xs">
-                <CheckCircle2 className="w-4 h-4" />
-                Ready for Production
+                <CheckCircle2 className="w-4 h-4" /> {t('readyForProduction')}
               </div>
-              <h3 className="text-3xl font-bold tracking-tight">Welcome to JewelFlow by Walsong Group</h3>
-              <p className="text-muted-foreground text-lg">
-                Your system is locally synchronized and secure. Start by adding items to your inventory or configuring your staff roles in Settings.
-              </p>
+              <h3 className="text-3xl font-bold tracking-tight">{t('welcomeTitle')}</h3>
+              <p className="text-muted-foreground text-lg">{t('welcomeDesc')}</p>
               <div className="flex gap-4">
                 <Link href="/inventory">
                   <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-                    <Package className="w-4 h-4 mr-2" /> Add First Item
+                    <Package className="w-4 h-4 mr-2" /> {t('addFirstItem')}
                   </Button>
                 </Link>
                 <Link href="/settings">
                   <Button variant="outline" className="border-border/60 hover:border-primary/40">
-                    <Settings className="w-4 h-4 mr-2" /> Configure App
+                    <Settings className="w-4 h-4 mr-2" /> {t('configureApp')}
                   </Button>
                 </Link>
               </div>
@@ -321,77 +241,32 @@ export default function Home() {
           </div>
         )}
 
-        {/* Quick Actions + Daily Rates */}
+        {/* Quick Actions + Rates */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3">
             <RatesWidget />
           </div>
-
           <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-            <Link href="/pos" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
-                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <HandCoins className="w-6 h-6 text-primary" />
-                  </div>
-                  <span className="font-medium text-lg tracking-tight">New Sale</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/inventory" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
-                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Package className="w-6 h-6 text-foreground" />
-                  </div>
-                  <span className="font-medium text-lg tracking-tight">Inventory</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/reports" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
-                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <BarChart3 className="w-6 h-6 text-blue-500" />
-                  </div>
-                  <span className="font-medium text-lg tracking-tight">Reports</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/settings" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
-                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Settings className="w-6 h-6 text-foreground" />
-                  </div>
-                  <span className="font-medium text-lg tracking-tight">Settings</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/karigar" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
-                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Hammer className="w-6 h-6 text-primary" />
-                  </div>
-                  <span className="font-medium text-lg tracking-tight">Karigar</span>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/chit" className="block group h-full">
-              <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
-                <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
-                  <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Coins className="w-6 h-6 text-amber-500" />
-                  </div>
-                  <span className="font-medium text-lg tracking-tight">Gold Chit</span>
-                </CardContent>
-              </Card>
-            </Link>
+            {[
+              { href: "/pos", icon: HandCoins, label: t('newSale'), color: "bg-primary/10 text-primary" },
+              { href: "/inventory", icon: Package, label: t('inventory'), color: "bg-secondary text-foreground" },
+              { href: "/reports", icon: BarChart3, label: t('reports'), color: "bg-blue-500/10 text-blue-600" },
+              { href: "/settings", icon: Settings, label: t('settings'), color: "bg-secondary text-foreground" },
+              { href: "/karigar", icon: Hammer, label: t('karigar'), color: "bg-primary/10 text-primary" },
+              { href: "/chit", icon: Coins, label: t('chit'), color: "bg-amber-500/10 text-amber-600" },
+            ].map(({ href, icon: Icon, label, color }) => (
+              <Link key={href} href={href} className="block group h-full">
+                <Card className="glass-card h-full hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/5 active:scale-[0.97]">
+                  <CardContent className="p-6 flex flex-col items-center justify-center space-y-4 h-full">
+                    <div className={`w-14 h-14 rounded-full ${color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <span className="font-medium text-lg tracking-tight">{label}</span>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
         </section>
 
@@ -399,38 +274,35 @@ export default function Home() {
         <section className="pt-8 border-t border-border/20">
           <PinLock requiredRole="owner">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-
-              {/* Stock Overview */}
               <Card className="glass-card gold-shimmer relative overflow-hidden">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-primary text-2xl tracking-tight">
-                    <ShieldCheck className="w-6 h-6" />
-                    Stock Portfolio
+                    <ShieldCheck className="w-6 h-6" /> {t('stockPortfolio')}
                   </CardTitle>
-                  <CardDescription>Real-time inventory calculation</CardDescription>
+                  <CardDescription>{t('realTimeCalc')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4 relative z-10">
                     <div className="flex justify-between items-center p-4 bg-background/50 rounded-xl border border-border/50">
-                      <span className="text-muted-foreground uppercase text-xs tracking-wider">Total Gold Stock</span>
+                      <span className="text-muted-foreground uppercase text-xs tracking-wider">{t('totalGoldStock')}</span>
                       <span className="font-mono font-medium text-lg">
                         {stats.goldWeight.t}<span className="text-xs text-muted-foreground">T</span> {stats.goldWeight.m}<span className="text-xs text-muted-foreground">M</span> {stats.goldWeight.l}<span className="text-xs text-muted-foreground">L</span>
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-background/50 rounded-xl border border-border/50">
-                      <span className="text-muted-foreground uppercase text-xs tracking-wider">Total Silver Stock</span>
+                      <span className="text-muted-foreground uppercase text-xs tracking-wider">{t('totalSilverStock')}</span>
                       <span className="font-mono font-medium text-lg">
                         {stats.silverWeight.t}<span className="text-xs text-muted-foreground">T</span> {stats.silverWeight.m}<span className="text-xs text-muted-foreground">M</span> {stats.silverWeight.l}<span className="text-xs text-muted-foreground">L</span>
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-primary/10 rounded-xl border border-primary/20 mt-4 h-16">
-                      <span className="text-primary font-medium tracking-wide">Daily Revenue</span>
+                      <span className="text-primary font-medium tracking-wide">{t('dailyRevenue')}</span>
                       <span className={`font-mono font-bold text-2xl text-foreground tracking-tight transition-all duration-500 ${!showFinancials ? 'blur-md select-none' : ''}`}>
                         रू {stats.revenueDay.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-secondary/20 rounded-xl border border-border/30 h-16">
-                      <span className="text-muted-foreground font-medium tracking-wide">Dhito Liability</span>
+                      <span className="text-muted-foreground font-medium tracking-wide">{t('dhitoLiability')}</span>
                       <span className={`font-mono font-bold text-2xl text-foreground tracking-tight transition-all duration-500 ${!showFinancials ? 'blur-md select-none' : ''}`}>
                         रू {stats.dhitoLiability.toLocaleString()}
                       </span>
@@ -439,36 +311,31 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              {/* Settings */}
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-2xl tracking-tight">
-                    <Settings className="w-6 h-6 text-foreground" />
-                    System Settings
+                    <Settings className="w-6 h-6 text-foreground" /> {t('systemSettings')}
                   </CardTitle>
-                  <CardDescription>Local-first database controls and IRD logs</CardDescription>
+                  <CardDescription>{t('localFirstDb')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
                   <div className="space-y-4">
-                    <h4 className="text-base font-medium text-foreground tracking-tight">Local Database Backup</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Export the current RxDB to a JSON file. Save to a pen drive daily to protect your data.
-                    </p>
+                    <h4 className="text-base font-medium text-foreground tracking-tight">{t('localDbBackup')}</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{t('backupDesc')}</p>
                     <BackupButton />
                   </div>
                   <div className="pt-6 border-t border-border/50">
-                    <h4 className="text-base font-medium text-foreground mb-4">Hardware Integrations</h4>
+                    <h4 className="text-base font-medium text-foreground mb-4">{t('hardwareInteg')}</h4>
                     <div className="flex items-center justify-between p-4 bg-background/50 rounded-xl border border-border/50">
-                      <span className="text-sm text-muted-foreground font-medium">Digital Weighing Scale</span>
-                      <span className="text-sm font-medium text-green-500 bg-green-500/10 px-3 py-1 rounded-full flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        Ready
+                      <span className="text-sm text-muted-foreground font-medium">{t('weighingScale')}</span>
+                      <span className="text-sm font-medium text-green-600 bg-green-500/10 px-3 py-1 rounded-full flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        {t('ready')}
                       </span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
             </div>
           </PinLock>
         </section>

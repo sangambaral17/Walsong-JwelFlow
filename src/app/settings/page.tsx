@@ -13,10 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
-    ArrowLeft, Save, Palette, Store, CheckCircle2, TrendingUp,
+    Save, Palette, Store, CheckCircle2, TrendingUp,
     ShieldCheck, AlertTriangle, Lock, RefreshCcw, Download, ShieldAlert
 } from "lucide-react";
-import Link from "next/link";
+import { GlobalNav } from "@/components/global-nav";
 
 const ACCENT_PRESETS = [
     { name: "Burnished Gold", color: "#D4AF37" },
@@ -146,16 +146,8 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/"><Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary"><ArrowLeft className="w-4 h-4 mr-2" /> Dashboard</Button></Link>
-                        <div className="h-6 w-px bg-border/30" />
-                        <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2"><Store className="w-5 h-5 text-primary" /> Settings</h1>
-                    </div>
-                </div>
-            </header>
+        <div className="min-h-screen warm-bg-gradient text-foreground">
+            <GlobalNav />
 
             <main className="container mx-auto px-4 py-8 max-w-3xl">
                 <PinLock requiredRole="owner">

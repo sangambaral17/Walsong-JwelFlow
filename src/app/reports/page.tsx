@@ -3,8 +3,8 @@
 import { PinLock } from "@/components/auth/pin-lock";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, TrendingUp, ShieldCheck, Calendar, Printer, Download } from "lucide-react";
-import Link from "next/link";
+import { TrendingUp, Calendar, Printer, Download } from "lucide-react";
+import { GlobalNav } from "@/components/global-nav";
 import {
     AreaChart,
     Area,
@@ -263,7 +263,7 @@ export default function ReportsPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen warm-bg-gradient text-foreground">
             {/* Monthly Summary Print Layout (hidden, print-only) */}
             {showMonthlySummary && monthlySummary && (
                 <div className="hidden print:block w-[80mm] bg-white text-black p-4 font-mono text-xs mx-auto">
@@ -319,21 +319,7 @@ export default function ReportsPage() {
                 </div>
             )}
 
-            <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl print:hidden">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/">
-                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Dashboard
-                            </Button>
-                        </Link>
-                        <div className="h-6 w-px bg-border/30" />
-                        <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-primary" /> Reports & Analytics
-                        </h1>
-                    </div>
-                </div>
-            </header>
+            <GlobalNav />
 
             <main className="container mx-auto px-4 py-8 max-w-6xl space-y-8 print:hidden">
                 <PinLock requiredRole="owner">

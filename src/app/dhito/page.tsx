@@ -13,8 +13,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, HandCoins, CheckCircle2, Search, Wallet, Clock, AlertTriangle, Ban, CreditCard, Printer, ChevronDown, ChevronUp, Phone, FileText } from "lucide-react";
-import Link from "next/link";
+import { Plus, HandCoins, CheckCircle2, Search, Wallet, Clock, AlertTriangle, Ban, CreditCard, Printer, ChevronDown, ChevronUp, Phone, FileText } from "lucide-react";
+import { GlobalNav } from "@/components/global-nav";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -377,25 +377,18 @@ export default function DhitoPage() {
     // ═══════════════════════════════════════════════════════════════════════════
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            {/* Subtle ambient glow */}
-            <div className="fixed inset-0 pointer-events-none z-0">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full bg-primary/3 blur-[120px]" />
-            </div>
+        <div className="min-h-screen warm-bg-gradient text-foreground">
+            <GlobalNav />
 
-            {/* ─── Header ─── */}
-            <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/"><Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary"><ArrowLeft className="w-4 h-4 mr-2" /> Dashboard</Button></Link>
-                        <div className="h-6 w-px bg-border/30" />
-                        <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2"><HandCoins className="w-5 h-5 text-primary" /> Dhito (बन्धकी)</h1>
-                    </div>
-                    <Button onClick={() => setNewDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-                        <Plus className="w-4 h-4 mr-2" /> New Dhito
-                    </Button>
-                </div>
-            </header>
+            {/* Page Action Bar */}
+            <div className="container mx-auto px-4 py-3 flex items-center justify-between no-print">
+                <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+                    <HandCoins className="w-5 h-5 text-primary" /> Dhito (बन्धकी)
+                </h2>
+                <Button onClick={() => setNewDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+                    <Plus className="w-4 h-4 mr-2" /> New Dhito
+                </Button>
+            </div>
 
             <main className="container mx-auto px-4 py-8 max-w-7xl space-y-8 relative z-10">
 
@@ -566,6 +559,22 @@ export default function DhitoPage() {
                                                     <Button variant="ghost" size="sm" onClick={() => handlePrint(item)} className="text-muted-foreground hover:text-primary h-8 w-8 p-0">
                                                         <Printer className="w-3.5 h-3.5" />
                                                     </Button>
+                                                    {item.customer_phone && (
+                                                        <Button
+                                                            variant="ghost" size="sm"
+                                                            onClick={() => {
+                                                                const phone = item.customer_phone.replace(/[^0-9]/g, "");
+                                                                const days = getDaysElapsed(item.date_pawned);
+                                                                const interest = Math.round(calcInterest(item.loan_amount, item.interest_rate, days));
+                                                                const msg = `Namaste ${item.customer_name}! 🙏\n\nYour Dhito (Pawn) loan at *${profile.shop_name || "Walsong Jewellers"}* reminder:\n• Item: ${item.item_description}\n• Loan Amount: रू ${item.loan_amount.toLocaleString()}\n• Interest (${days}d): रू ${interest.toLocaleString()}\n• Total Due: रू ${(item.loan_amount + interest).toLocaleString()}\n\nPlease contact us to redeem your item. 📞 ${profile.phone || ""}`;
+                                                                window.open(`https://wa.me/977${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+                                                            }}
+                                                            className="h-8 w-8 p-0 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                                                            title="Send WhatsApp Reminder"
+                                                        >
+                                                            <Phone className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    )}
                                                     {item.status === "active" && (
                                                         <>
                                                             <Button

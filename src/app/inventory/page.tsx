@@ -15,8 +15,8 @@ import {
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Package, ArrowLeft, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Plus, Package, Trash2 } from "lucide-react";
+import { GlobalNav } from "@/components/global-nav";
 
 interface InventoryItem {
     id: string;
@@ -46,7 +46,6 @@ export default function InventoryPage() {
 
     useEffect(() => {
         loadItems();
-        // Subscribe for live reactivity
         let sub: any;
         (async () => {
             const db = await getDb();
@@ -76,7 +75,6 @@ export default function InventoryPage() {
             created_at: new Date().toISOString(),
         });
 
-        // Write audit log
         await db.audit_log.insert({
             id: safeUUID(),
             timestamp: new Date().toISOString(),
@@ -111,85 +109,77 @@ export default function InventoryPage() {
     });
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl no-print">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/">
-                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Dashboard
-                            </Button>
-                        </Link>
-                        <div className="h-6 w-px bg-border/30" />
-                        <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-                            <Package className="w-5 h-5 text-primary" /> Inventory
-                        </h1>
-                    </div>
-                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all">
-                                <Plus className="w-4 h-4 mr-2" /> Add Item
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="glass-card sm:max-w-lg">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl">Add Inventory Item</DialogTitle>
-                                <DialogDescription className="text-muted-foreground">Enter weight in Tola-Masha-Lal format.</DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Item Name</Label>
-                                        <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="mt-1 bg-background/50" placeholder="22K Chain" />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Category</Label>
-                                        <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="mt-1 w-full h-9 rounded-md border border-input bg-background/50 px-3 text-sm">
-                                            <option value="Gold">Gold</option>
-                                            <option value="Silver">Silver</option>
-                                            <option value="Diamond">Diamond</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
+        <div className="min-h-screen warm-bg-gradient text-foreground">
+            <GlobalNav />
+
+            {/* Page Action Bar */}
+            <div className="container mx-auto px-4 py-3 flex items-center justify-between no-print">
+                <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+                    <Package className="w-5 h-5 text-primary" /> Inventory
+                </h2>
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all">
+                            <Plus className="w-4 h-4 mr-2" /> Add Item
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="glass-card sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl">Add Inventory Item</DialogTitle>
+                            <DialogDescription className="text-muted-foreground">Enter weight in Tola-Masha-Lal format.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Item Name</Label>
+                                    <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="mt-1 bg-background/50" placeholder="22K Chain" />
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-primary">Tola</Label>
-                                        <Input type="number" value={form.tola} onChange={e => setForm({ ...form, tola: e.target.value })} className="mt-1 bg-background/50 border-primary/30 focus-visible:ring-primary" placeholder="0" />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-primary">Masha</Label>
-                                        <Input type="number" value={form.masha} onChange={e => setForm({ ...form, masha: e.target.value })} className="mt-1 bg-background/50 border-primary/30 focus-visible:ring-primary" placeholder="0" />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-primary">Lal</Label>
-                                        <Input type="number" value={form.lal} onChange={e => setForm({ ...form, lal: e.target.value })} className="mt-1 bg-background/50 border-primary/30 focus-visible:ring-primary" placeholder="0" />
-                                    </div>
-                                </div>
-                                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-sm text-center">
-                                    = <span className="font-mono font-semibold text-primary text-lg">{calculatedGrams.toFixed(4)}</span> grams
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Jarti (Wastage) रू</Label>
-                                        <Input type="number" value={form.jarti} onChange={e => setForm({ ...form, jarti: e.target.value })} className="mt-1 bg-background/50" placeholder="0" />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Jyala (Making) रू</Label>
-                                        <Input type="number" value={form.jyala} onChange={e => setForm({ ...form, jyala: e.target.value })} className="mt-1 bg-background/50" placeholder="0" />
-                                    </div>
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Category</Label>
+                                    <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="mt-1 w-full h-9 rounded-md border border-input bg-background/50 px-3 text-sm">
+                                        <option value="Gold">Gold</option>
+                                        <option value="Silver">Silver</option>
+                                        <option value="Diamond">Diamond</option>
+                                        <option value="Other">Other</option>
+                                    </select>
                                 </div>
                             </div>
-                            <DialogFooter>
-                                <Button onClick={handleAdd} disabled={!form.name} className="bg-primary text-primary-foreground hover:bg-primary/90 w-full shadow-lg shadow-primary/20">
-                                    Add to Inventory
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </header>
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-primary">Tola</Label>
+                                    <Input type="number" value={form.tola} onChange={e => setForm({ ...form, tola: e.target.value })} className="mt-1 bg-background/50 border-primary/30 focus-visible:ring-primary" placeholder="0" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-primary">Masha</Label>
+                                    <Input type="number" value={form.masha} onChange={e => setForm({ ...form, masha: e.target.value })} className="mt-1 bg-background/50 border-primary/30 focus-visible:ring-primary" placeholder="0" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-primary">Lal</Label>
+                                    <Input type="number" value={form.lal} onChange={e => setForm({ ...form, lal: e.target.value })} className="mt-1 bg-background/50 border-primary/30 focus-visible:ring-primary" placeholder="0" />
+                                </div>
+                            </div>
+                            <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-sm text-center">
+                                = <span className="font-mono font-semibold text-primary text-lg">{calculatedGrams.toFixed(4)}</span> grams
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Jarti (Wastage) रू</Label>
+                                    <Input type="number" value={form.jarti} onChange={e => setForm({ ...form, jarti: e.target.value })} className="mt-1 bg-background/50" placeholder="0" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Jyala (Making) रू</Label>
+                                    <Input type="number" value={form.jyala} onChange={e => setForm({ ...form, jyala: e.target.value })} className="mt-1 bg-background/50" placeholder="0" />
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={handleAdd} disabled={!form.name} className="bg-primary text-primary-foreground hover:bg-primary/90 w-full shadow-lg shadow-primary/20">
+                                Add to Inventory
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
 
             <main className="container mx-auto px-4 py-8 max-w-6xl">
                 <PinLock requiredRole="manager">
@@ -211,7 +201,7 @@ export default function InventoryPage() {
                                     <TableRow>
                                         <TableCell colSpan={7} className="text-center py-16 text-muted-foreground">
                                             <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                                            No inventory items yet. Click "Add Item" to get started.
+                                            No inventory items yet. Click &quot;Add Item&quot; to get started.
                                         </TableCell>
                                     </TableRow>
                                 ) : (

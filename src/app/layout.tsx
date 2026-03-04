@@ -27,11 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={`${playfair.variable} ${inter.variable} font-sans antialiased`}>
         <GlobalErrorBoundary>
           <AppShell>{children}</AppShell>
-          <Toaster position="top-right" theme="dark" richColors />
+          <Toaster position="top-right" theme="light" richColors />
         </GlobalErrorBoundary>
       </body>
     </html>
