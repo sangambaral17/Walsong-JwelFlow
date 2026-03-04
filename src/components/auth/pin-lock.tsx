@@ -12,12 +12,18 @@ interface PinLockProps {
 }
 
 export function PinLock({ children, requiredRole }: PinLockProps) {
-    const { user, login, logout } = useAuth();
+    const { user, login, logout, isLocked, unlockSession } = useAuth();
     const [pin, setPin] = useState("");
     const [error, setError] = useState(false);
 
     const handleUnlock = async () => {
-        const success = await login(pin);
+        let success = false;
+        if (!user) {
+            success = await login(pin);
+        } else {
+            success = await unlockSession(pin);
+        }
+
         if (!success) {
             setError(true);
             setPin("");
@@ -27,15 +33,19 @@ export function PinLock({ children, requiredRole }: PinLockProps) {
         }
     };
 
-    if (!user) {
+    if (!user || isLocked) {
         return (
             <div className="flex flex-col items-center justify-center p-12 border border-border/40 rounded-2xl bg-gradient-to-b from-card/30 to-background/50 backdrop-blur-xl shadow-Inner h-full min-h-[300px]">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
                     <Lock className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-2xl font-medium mb-3 text-foreground tracking-tight">Staff Login</h3>
+                <h3 className="text-2xl font-medium mb-3 text-foreground tracking-tight">
+                    {!user ? "Staff Login" : `Unlock Session (${user.name})`}
+                </h3>
                 <p className="text-muted-foreground text-sm mb-8 text-center max-w-sm">
-                    Please authenticate to access this section. (Default Owner PIN: 1234)
+                    {!user
+                        ? "Please authenticate to access this section. (Default Owner PIN: 1234)"
+                        : "Session locked. Enter your PIN to continue."}
                 </p>
 
                 <div className="flex space-x-3 w-full max-w-xs">

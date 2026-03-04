@@ -10,21 +10,22 @@ export function LangToggle({ className = "" }: { className?: string }) {
     const { lang, setLang } = useLang();
 
     return (
-        <div className={`flex items-center rounded-full border border-border/50 bg-muted/40 p-0.5 gap-0.5 ${className}`}>
+        <div className={`flex items-center gap-1.5 ${className}`}>
             <button
                 onClick={() => setLang("en")}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 ${lang === "en"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                className={`text-[0.68rem] font-bold uppercase tracking-widest transition-all ${lang === "en"
+                    ? "text-[#F5D06B]"
+                    : "text-[#F5D06B]/50 hover:text-[#F5D06B]/80"
                     }`}
             >
                 EN
             </button>
+            <span className="text-[#F5D06B]/30 text-[0.68rem]">/</span>
             <button
                 onClick={() => setLang("ne")}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 ${lang === "ne"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                className={`text-[0.68rem] font-bold uppercase tracking-widest transition-all ${lang === "ne"
+                    ? "text-[#F5D06B]"
+                    : "text-[#F5D06B]/50 hover:text-[#F5D06B]/80"
                     }`}
             >
                 नेपाली

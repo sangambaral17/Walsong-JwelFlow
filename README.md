@@ -1,54 +1,35 @@
-# Walsong JwelFlow — Premier Jewelry ERP
-**A Next-Generation, Local-First Management System for Sunchadi Pasals**
+# Walsong JwelFlow ERP
+**A Premium, Local-First Jewelry Retail Management System for Nepal**
 
-> **Created and Directed by Sangam Baral, Founder & CEO**
-
----
+Developed for **Walsong Group** under the leadership of **CEO & Founder Er. Sangam Baral**.
 
 ## Overview
-Walsong JwelFlow is an ultra-premium, complete Enterprise Resource Planning (ERP) solution built from the ground up for modern jewelry shops. It combines luxurious aesthetics with robust, offline-capable architecture.
+Walsong JwelFlow is an advanced, offline-first Point of Sale (POS) and Enterprise Resource Planning (ERP) application specifically designed to meet the unique needs of the Nepalese jewelry industry. Built with Next.js, Tauri, and RxDB, it provides complete data sovereignty, real-time market rate synchronization, and automated IRD billing compliance.
 
-It handles Inventory Management, Point of Sale (POS), Dhito/Bandhaki (Pawn/Loan) workflows, Role-Based Staff Management, and real-time Analytics — all without requiring a persistent internet connection.
+## Key Features
+- **10 Integrated Modules**: Dashboard, POS, Inventory, Dhito (Pawn), Karigar (Artisans), Chit (Gold Savings), Customers, Reports, Audit, and Settings.
+- **Local-First Architecture**: Runs purely offline using RxDB (IndexedDB) with optional encrypted cloud backup. Ensures zero data loss even during internet outages.
+- **Bilingual Interface**: Seamlessly toggles between English and Nepali (नेपाली) language modes.
+- **WhatsApp Integration**: Deep-linked WhatsApp message generation for sending Dhito reminders, Karigar job completion notices, Chit maturity alerts, and POS invoice receipts directly to customers.
+- **IRD Compliance Prepared**: Generates PDF invoices and QR codes formatted specifically for Nepal's Inland Revenue Department requirements.
 
-## Distribution & Deployment Strategies
+## Documentation
+Comprehensive documentation for all stakeholders is available in the `docs/` directory:
+- [01. Overview and Introduction](docs/01_Overview_and_Introduction.md)
+- [02. Technical Architecture](docs/02_Technical_Architecture.md)
+- [03. Dashboard](docs/03_Dashboard.md)
+- [04. POS and Billing](docs/04_POS_and_Billing.md)
+- [05. Dhito (Pawn) System](docs/05_Dhito_Pawn_System.md)
+- [06. Karigar Management](docs/06_Karigar_Management.md)
+- [07. Chit Gold Savings](docs/07_Chit_Gold_Savings.md)
+- [08. Inventory and Audit](docs/08_Inventory_and_Audit.md)
+- [09. Reports and Settings](docs/09_Reports_and_Settings.md)
+- [10. Final Project Report](docs/10_Final_Project_Report.md)
 
-Walsong JwelFlow is designed to be distributed to clients in two distinct ways, depending on their needs:
-
-### 1. Desktop Application (Native `.exe`)
-This is the **primary recommended way** to distribute JwelFlow to jewelry shop owners. It provides a secure, isolated environment where their business data is completely safe.
-
-*   **How it works**: We use **Tauri** to package the Next.js web application into a native Windows executable.
-*   **Data Security**: The RxDB local database is stored deep within the Windows `%APPDATA%` folder. This means even if the user clears their web browser cookies or history, their gigabytes of shop data, invoices, and inventory remain perfectly intact and completely offline.
-*   **How to Build for Desktop**:
-    Please refer to our dedicated guide at `docs/BUILD_GUIDE.md` for exact terminal commands to generate the `WalsongJwelFlow_Setup.exe` file.
-*   **How to Distribute**: Simply copy the generated `_setup.exe` onto a Pen Drive and hand it to the shop owner. They double-click it, install it, and the app runs just like Microsoft Word or Excel.
-
-### 2. Web Application (Cloud Hosted)
-If a client wishes to access their shop dashboard from multiple devices (e.g., from home and the shop simultaneously), JwelFlow can be hosted as a traditional web application.
-
-*   **How it works**: The Next.js application is deployed to a cloud provider like Vercel, AWS, or Netlify.
-*   **Data Caveat**: Because it runs in a standard web browser (Chrome, Edge), the RxDB local database is stored in the browser's IndexedDB. **If the user clicks "Clear browsing data", their entire shop database will be permanently deleted.**
-*   *(Future Road-map: A remote synchronization server can be built using RxDB Sync to continuously backup data to a cloud PostgreSQL database, mitigating browser storage risks).*
-*   **How to Deploy for Web**:
-    1. Push this repository to GitHub.
-    2. Connect the repository to Vercel (or preferred host).
-    3. The build command is `npm run build` and the output directory is `.next`.
-
----
-
-## Technical Stack
-*   **Frontend Ecosystem**: Next.js 15 (React 19), Tailwind CSS, Framer Motion, customized Radix UI (`shadcn/ui`).
-*   **Database**: RxDB (Reactive Database) for offline-first, local hydration.
-*   **Packaging**: Tauri (Rust-based webview wrapper for Windows).
-*   **Theming**: Dynamic CSS custom property injection based on an Emerald/Luxury design system.
-
-## Project Structure
-*   `/src/app`: Next.js App Router pages (Dashboard, POS, Inventory, Settings, etc.)
-*   `/src/components`: Reusable UI modules, including global shells and interactive modals.
-*   `/src/lib`: Core logic. `db/` contains RxDB schemas and setup. `auth-context.tsx` and `shop-context.tsx` manage global state.
-*   `/src-tauri`: The Rust backend and configuration required to compile the Windows `.exe`.
-*   `/docs`: Detailed guides, including the `BUILD_GUIDE.md` and `USER_MANUAL.md`.
+## Tech Stack
+- **Frontend**: Next.js 16 (React 19), Tailwind CSS, Lucide Icons
+- **Desktop Wrapper**: Tauri 2.0 (Rust-based)
+- **Database**: RxDB (Offline-first synced IndexedDB)
 
 ---
-*Developed with precision for the modern jewelry industry.*
-**© 2026 Walsong JwelFlow. Sangam Baral, Founder & CEO.**
+© 2026 Walsong Group. All rights reserved.

@@ -113,7 +113,7 @@ export default function Home() {
         {/* Welcome */}
         <section className="flex items-center justify-between pt-2">
           <div className="space-y-1">
-            <h2 className="text-3xl font-medium tracking-tight">{t('welcome')}, {user?.name || "Walsong Group"}</h2>
+            <h2 className="text-3xl font-medium tracking-tight">{t('welcome')}, {profile?.shop_name || "Walsong Group"}</h2>
             <p className="text-muted-foreground text-base">{t('manageInventory')}</p>
           </div>
           <div className="flex items-center gap-3">
